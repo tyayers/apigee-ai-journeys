@@ -1160,11 +1160,14 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
         url: "https://gateway.example.com/v1?a=1&b=2",
         apiKey: 'ag-key-"special"\\test',
       },
-      allowedModels: [
-        "gemini-4-carbon",
-        "gemini-4-hydrogen",
-        "gemini-3.5-flash-lite",
-      ],
+      models: {
+        defaultModelId: "gemini-4-hydrogen",
+        list: [
+          { modelId: "gemini-4-hydrogen" },
+          { modelId: "gemini-4-carbon" },
+          { modelId: "gemini-3.1-flash-lite" },
+        ],
+      },
       agentMode: "accept-edits",
       artifactReviewPolicy: "always-proceed",
       toolPermission: "always-proceed",
@@ -1368,11 +1371,14 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           url: "https://ag.gateway.example.com",
           apiKey: "portal-generated-client-id-999",
         },
-        allowedModels: [
-          "gemini-4-carbon",
-          "gemini-4-hydrogen",
-          "gemini-3.5-flash-lite",
-        ],
+        models: {
+          defaultModelId: "gemini-4-hydrogen",
+          list: [
+            { modelId: "gemini-4-hydrogen" },
+            { modelId: "gemini-4-carbon" },
+            { modelId: "gemini-3.1-flash-lite" },
+          ],
+        },
         agentMode: "accept-edits",
         artifactReviewPolicy: "always-proceed",
         toolPermission: "always-proceed",
@@ -1398,11 +1404,14 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           url: "https://ag.gateway.example.com",
           apiKey: "portal-generated-client-id-999",
         },
-        allowedModels: [
-          "gemini-4-carbon",
-          "gemini-4-hydrogen",
-          "gemini-3.5-flash-lite",
-        ],
+        models: {
+          defaultModelId: "gemini-4-hydrogen",
+          list: [
+            { modelId: "gemini-4-hydrogen" },
+            { modelId: "gemini-4-carbon" },
+            { modelId: "gemini-3.1-flash-lite" },
+          ],
+        },
         agentMode: "accept-edits",
         artifactReviewPolicy: "always-proceed",
         toolPermission: "always-proceed",

@@ -1920,14 +1920,41 @@ if command -v codium >/dev/null 2>&1 && [[ -s "$CODIUM_AG_VSIX" ]]; then
     ensure_user_dir "$HOMEDIR/.config/VSCodium"
     ensure_user_dir "$HOMEDIR/.vscode-oss"
     ensure_user_dir "$HOMEDIR/.vscode-oss/extensions"
-    HOME="$HOMEDIR" codium \
-      --no-sandbox \
-      --user-data-dir "$HOMEDIR/.config/VSCodium" \
-      --extensions-dir "$HOMEDIR/.vscode-oss/extensions" \
-      --install-extension "$CODIUM_AG_VSIX" >/dev/null 2>&1 || true
-    if [[ "$(id -u)" -eq 0 ]]; then
-      chown -R "$USER_UID:$USER_GID" -- "$HOMEDIR/.config/VSCodium" "$HOMEDIR/.vscode-oss" 2>/dev/null || true
+    ensure_user_dir "$HOMEDIR/.local/state"
+    ensure_user_dir "$HOMEDIR/.local/state/VSCodium"
+    ensure_user_dir "$HOMEDIR/.cache"
+    ensure_user_dir "$HOMEDIR/.cache/VSCodium"
+    if [[ "$(id -u)" -eq 0 ]] && command -v runuser >/dev/null 2>&1; then
+      runuser -u "$USERNAME" -- env \
+        HOME="$HOMEDIR" \
+        XDG_CONFIG_HOME="$HOMEDIR/.config" \
+        XDG_STATE_HOME="$HOMEDIR/.local/state" \
+        XDG_CACHE_HOME="$HOMEDIR/.cache" \
+        codium \
+        --no-sandbox \
+        --user-data-dir "$HOMEDIR/.config/VSCodium" \
+        --extensions-dir "$HOMEDIR/.vscode-oss/extensions" \
+        --install-extension "$CODIUM_AG_VSIX" >/dev/null 2>&1 || true
+    else
+      HOME="$HOMEDIR" \
+      XDG_CONFIG_HOME="$HOMEDIR/.config" \
+      XDG_STATE_HOME="$HOMEDIR/.local/state" \
+      XDG_CACHE_HOME="$HOMEDIR/.cache" \
+      codium \
+        --no-sandbox \
+        --user-data-dir "$HOMEDIR/.config/VSCodium" \
+        --extensions-dir "$HOMEDIR/.vscode-oss/extensions" \
+        --install-extension "$CODIUM_AG_VSIX" >/dev/null 2>&1 || true
     fi
+  fi
+  if [[ "$(id -u)" -eq 0 ]]; then
+    for codium_dir in \
+      "$HOMEDIR/.config/VSCodium" \
+      "$HOMEDIR/.vscode-oss" \
+      "$HOMEDIR/.local/state" \
+      "$HOMEDIR/.cache/VSCodium"; do
+      [[ -e "$codium_dir" ]] && chown -R "$USER_UID:$USER_GID" -- "$codium_dir" 2>/dev/null || true
+    done
   fi
 fi
 
