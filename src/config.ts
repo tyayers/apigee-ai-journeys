@@ -17,8 +17,12 @@ export interface AppConfig {
   setupUserScript: string | null;
   onConnectScript: string | null;
   hasExplicitOnConnectOverride: boolean;
+  keepSessionsRunning: boolean;
   isCompiledBinary: boolean;
   maxConnectCpuAvg5m: number;
+  portalHost: string | null;
+  portalAdminClientId: string | null;
+  portalAdminClientSecret: string | null;
   usersFile: string;
   dataDir: string;
   configDir: string;
@@ -91,8 +95,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     setupUserScript: env.SETUP_USER_SCRIPT?.trim() || null,
     onConnectScript,
     hasExplicitOnConnectOverride,
+    keepSessionsRunning: parseBool(env.KEEP_SESSIONS_RUNNING, true),
     isCompiledBinary,
     maxConnectCpuAvg5m,
+    portalHost: env.PORTAL_HOST?.trim().replace(/\/+$/, "") || null,
+    portalAdminClientId: env.PORTAL_ADMIN_CLIENT_ID?.trim() || null,
+    portalAdminClientSecret: env.PORTAL_ADMIN_CLIENT_SECRET?.trim() || null,
     usersFile,
     dataDir: env.DATA_DIR ? path.resolve(env.DATA_DIR) : path.join(baseDir, "data"),
     configDir: path.join(baseDir, "config"),

@@ -40,6 +40,8 @@ PORT=8080
 SESSION_SECRET=replace-with-openssl-rand-hex-32
 # Optional: allow WebSocket connections from multiple domains (comma-separated)
 # ALLOWED_ORIGINS=https://iap-domain.example.com,https://direct-domain.example.com
+# Optional: keep desktop sessions running on disconnect so users can reconnect/resume (default: true; set false for auto-logout)
+# KEEP_SESSIONS_RUNNING=true
 # Optional: Antigravity enterprise gateway (writes /etc/antigravity/admin_settings.json on startup)
 # ANTIGRAVITY_URL=https://your-enterprise-gateway.example.com
 # ANTIGRAVITY_KEY=your-gateway-api-key
@@ -50,6 +52,10 @@ SESSION_SECRET=replace-with-openssl-rand-hex-32
 # ANTHROPIC_DEFAULT_OPUS_MODEL=
 # ANTHROPIC_DEFAULT_SONNET_MODEL=
 # ANTHROPIC_DEFAULT_HAIKU_MODEL=
+# Optional: Apigee Developer Portal per-user coding-agent-app provisioning
+# PORTAL_HOST=https://your-apigee-portal-host.example.com
+# PORTAL_ADMIN_CLIENT_ID=
+# PORTAL_ADMIN_CLIENT_SECRET=
 ```
 
 ### 3. Start the Server
@@ -107,12 +113,14 @@ Because `antigravity-app` leaves `credentials: []` empty in `deployments/antigra
 2. Set `ANTIGRAVITY_URL` (your deployed `/antigravity` endpoint) and `ANTIGRAVITY_KEY` (the generated key) in `.env`.
 3. Restart the service (`sudo systemctl restart apigee-ai-demos`) so `/etc/antigravity/admin_settings.json` is written for all VM users.
 
+Alternatively, to provision a **per-user** `coding-agent-app` key automatically on connect via the Apigee Developer Portal, set `PORTAL_HOST`, `PORTAL_ADMIN_CLIENT_ID`, and `PORTAL_ADMIN_CLIENT_SECRET` in `.env` (with `ANTIGRAVITY_URL` and `ANTHROPIC_BASE_URL` set, leaving `ANTIGRAVITY_KEY` and `ANTHROPIC_API_KEY` empty). On connect, the server ensures the user exists in the portal, retrieves or creates `coding-agent-app` (`coding-agent-product`), and writes the user's `clientId` into `~/.antigravity/settings.json` and `~/.claude/settings.json`.
+
 ## VM Tool Bootstrap & Session Lifecycle (`scripts/on-connect.sh`)
 
 - **Installed once system-wide for everyone (`--system-only`)**: On startup as root, the server ensures **QTerminal**, **PCManFM-Qt**, **FeatherPad**, **LXQt Panel**, **VSCodium** (`codium`, with the **Google Antigravity** extension `Google.google-antigravity` staged from Open VSX and installed per user), **Google Chrome** (`google-chrome-stable`), **Claude Code** (`/usr/local/bin/claude`, with `/etc/claude-code/managed-settings.json` rendered from `config/anthropic_settings.json` disabling per-user background self-updates and applying any `ANTHROPIC_*` gateway/model variables from `.env`), **Claude Desktop with Cowork** (`claude-desktop` from Anthropic's official APT repository along with its QEMU/KVM/virtiofsd/bubblewrap sandbox dependencies and `kvm` group membership for VM users), and the **current latest releases** of the **Antigravity 2.0 desktop app** (`/opt/antigravity`), **Antigravity CLI** (`/usr/local/bin/agy`), and **Antigravity IDE** (`/opt/antigravity-ide`) are installed and kept updated at the OS level, configures `/etc/xrdp/sesman.ini` (`KillDisconnected=true`, `DisconnectedTimeLimit=60`), and—when `ANTIGRAVITY_URL` and `ANTIGRAVITY_KEY` are set in `.env`—renders `config/antigravity_settings.json` to `/etc/antigravity/admin_settings.json` for system-wide Antigravity enterprise gateway access.
-- **Fresh sign-in on every connect & forced sign-out on disconnect**:
-  - Before opening a new `xrdp` connection, `scripts/on-connect.sh <username> <homedir>` ensures the user belongs to the `kvm` group (when present, for Claude Cowork's local VM sandbox) and terminates any lingering `xrdp` / `LXQt` graphical session for that user first (leaving SSH sessions untouched) so `xrdp-sesman` always performs a clean desktop sign-in.
-  - Whenever the user disconnects (closes the browser tab, reloads, clicks **Disconnect**, or signs out), the server immediately runs `scripts/on-connect.sh --signout <username>` to sign out their desktop session.
+- **Persistent vs. auto-logout sessions (`KEEP_SESSIONS_RUNNING`, default `true`)**:
+  - When `KEEP_SESSIONS_RUNNING=true` (default), `/etc/xrdp/sesman.ini` is configured with `KillDisconnected=false` (`DisconnectedTimeLimit=0`) and browser disconnects leave the user's `xrdp` / `LXQt` session running so they can reconnect and resume where they left off. Users can explicitly stop their session using the **Stop session** button in the web UI (`POST /api/rdp/stop`) or **Sign Out** inside the desktop.
+  - When `KEEP_SESSIONS_RUNNING=false`, `/etc/xrdp/sesman.ini` is configured with `KillDisconnected=true` (`DisconnectedTimeLimit=60`), `scripts/on-connect.sh <username> <homedir>` terminates any lingering session before connecting, and browser disconnects immediately run `scripts/on-connect.sh --signout <username>`.
 - **Applied per user on connect (`./scripts/on-connect.sh <username> <homedir>`)**:
   1. Enforces the top **LXQt** panel (`panel1` in `~/.config/lxqt/panel.conf`, including explicit `menu_file=/etc/xdg/menus/lxqt-applications.menu` and a right-aligned **Sign Out** button) and a centered bottom **LXQt** dock (`panel2` with left/right expandable spacers), guarantees `lxqt-panel` is running, and marks `~/Desktop/*.desktop` shortcuts trusted.
   2. Copies `public/wallpaper.jpg` into `~/.local/share/backgrounds/wallpaper.jpg` with `WallpaperMode=zoom` and hides `Computer` / `Network` desktop icons (`DesktopShortcuts=Home, Trash`).

@@ -92,6 +92,7 @@ export interface RdpWsContext {
   hadBackendSession: boolean;
   superseded: boolean;
   signoutScheduled: boolean;
+  keepSessionsRunning: boolean;
   tcpSocket: net.Socket | null;
   tlsSocket: tls.TLSSocket | null;
   rdpHost: string;
@@ -109,6 +110,7 @@ export function createRdpWsContext(user: SessionUser, config: AppConfig): RdpWsC
     hadBackendSession: false,
     superseded: false,
     signoutScheduled: false,
+    keepSessionsRunning: config.keepSessionsRunning,
     tcpSocket: null,
     tlsSocket: null,
     rdpHost: config.rdpHost,
@@ -170,6 +172,14 @@ function finalizeAndSignOut(
     return;
   }
   ws.data.signoutScheduled = true;
+
+  if (ws.data.keepSessionsRunning) {
+    rdpLog(
+      ws.data,
+      `Keeping desktop session running for '${ws.data.user.username}' after ${trigger}`
+    );
+    return;
+  }
 
   const { username } = ws.data.user;
   void vmUsers.withUserSessionLock(username, async () => {
@@ -367,6 +377,7 @@ export function handleRdpWsMessage(
 
       try {
         await vmUsers.runOnConnectHook(username, {
+          email,
           onProgress: (statusText) => sendStatusFrame(ws, statusText),
         });
       } catch (err) {

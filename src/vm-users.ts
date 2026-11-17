@@ -9,6 +9,7 @@ import {
   EMBEDDED_ON_CONNECT_SCRIPT,
   EMBEDDED_WALLPAPER_JPG,
 } from "./embedded-assets.ts";
+import { ensurePortalCodingAgentKey, isPortalConfigured } from "./portal.ts";
 
 export interface StoredUserEntry {
   email: string;
@@ -485,6 +486,7 @@ export class VmUserManager {
         ON_CONNECT_WALLPAPER_SRC: wallpaperPath,
         ON_CONNECT_ANTIGRAVITY_ADMIN_SETTINGS_SRC: antigravitySettingsPath,
         ON_CONNECT_ANTHROPIC_SETTINGS_SRC: anthropicSettingsPath,
+        ON_CONNECT_KEEP_SESSIONS_RUNNING: this.config.keepSessionsRunning ? "true" : "false",
       },
     });
 
@@ -524,6 +526,7 @@ export class VmUserManager {
   async runOnConnectHook(
     username: string,
     options?: {
+      email?: string;
       homeDirOverride?: string;
       envOverrides?: Record<string, string>;
       onProgress?: (statusText: string) => void;
@@ -549,6 +552,26 @@ export class VmUserManager {
       homeDir = sys.homeDir;
     }
 
+    const portalEnv: Record<string, string> = {};
+    if (options?.email && isPortalConfigured(this.config)) {
+      options.onProgress?.("Provisioning developer API key...");
+      try {
+        const portalResult = await ensurePortalCodingAgentKey(this.config, options.email);
+        if (portalResult?.apiKey) {
+          portalEnv.ON_CONNECT_USER_ANTIGRAVITY_KEY = portalResult.apiKey;
+          portalEnv.ON_CONNECT_USER_ANTHROPIC_API_KEY = portalResult.apiKey;
+          console.log(
+            `${new Date().toISOString()} [portal] ${portalResult.createdApp ? "Created" : "Found"} coding-agent-app key for '${options.email}'`
+          );
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `${new Date().toISOString()} [portal] Failed provisioning coding-agent-app key for '${options.email}': ${msg}`
+        );
+      }
+    }
+
     const { scriptPath, wallpaperPath, antigravitySettingsPath, anthropicSettingsPath } =
       await this.resolveOnConnectAssets();
 
@@ -564,6 +587,8 @@ export class VmUserManager {
         ON_CONNECT_WALLPAPER_SRC: wallpaperPath,
         ON_CONNECT_ANTIGRAVITY_ADMIN_SETTINGS_SRC: antigravitySettingsPath,
         ON_CONNECT_ANTHROPIC_SETTINGS_SRC: anthropicSettingsPath,
+        ON_CONNECT_KEEP_SESSIONS_RUNNING: this.config.keepSessionsRunning ? "true" : "false",
+        ...portalEnv,
         ...(options?.envOverrides ?? {}),
       },
     });

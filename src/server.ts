@@ -251,6 +251,7 @@ export function createAppServer(
                 email: resolved.session.email,
                 username: resolved.session.username,
               },
+              keepSessionsRunning: config.keepSessionsRunning,
               demos: DEMO_CATALOG,
               metrics,
             },
@@ -316,6 +317,22 @@ export function createAppServer(
             );
             return jsonResponse({ error: msg }, 500);
           }
+        }
+
+        // Explicitly stop/sign out the user's running desktop session
+        if (pathname === "/api/rdp/stop" && req.method === "POST") {
+          const resolved = resolveRequestIdentity(req, config);
+          if (!resolved || "error" in resolved) {
+            return jsonResponse({ error: "Authentication required" }, 401);
+          }
+          if (!verifyCsrf(req, resolved.session)) {
+            return jsonResponse({ error: "Invalid CSRF token" }, 403);
+          }
+          const stopUser = resolved.session.username;
+          await vmUsers.withUserSessionLock(stopUser, async () => {
+            await vmUsers.terminateDesktopSession(stopUser, "disconnect");
+          });
+          return jsonResponse({ ok: true }, 200);
         }
 
         // Clear local cookie session (e.g. switching ?user=...) and sign out desktop session

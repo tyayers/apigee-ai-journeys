@@ -853,12 +853,19 @@ EOF
     rm -f /usr/share/backgrounds/apigee-wallpaper.png
   fi
 
-  # 1i. Configure xrdp-sesman (/etc/xrdp/sesman.ini) to reap disconnected sessions automatically
+  # 1i. Configure xrdp-sesman (/etc/xrdp/sesman.ini) according to ON_CONNECT_KEEP_SESSIONS_RUNNING
   local sesman_ini="${ON_CONNECT_SESMAN_INI:-/etc/xrdp/sesman.ini}"
+  local keep_sessions="${ON_CONNECT_KEEP_SESSIONS_RUNNING:-true}"
+  local target_kill="false"
+  local target_limit="0"
+  if [[ "$keep_sessions" != "true" && "$keep_sessions" != "1" ]]; then
+    target_kill="true"
+    target_limit="60"
+  fi
   if [[ -f "$sesman_ini" ]]; then
     local sesman_tmp
     sesman_tmp="$(mktemp "${TMPDIR:-/tmp}/sesman-ini.XXXXXX")"
-    awk '
+    TARGET_KILL="$target_kill" TARGET_LIMIT="$target_limit" awk '
       BEGIN {
         sec = ""
         saw_sessions = 0
@@ -867,8 +874,8 @@ EOF
       }
       function flush_sessions() {
         if (sec == "Sessions") {
-          if (!set_kill) { print "KillDisconnected=true"; set_kill = 1 }
-          if (!set_limit) { print "DisconnectedTimeLimit=60"; set_limit = 1 }
+          if (!set_kill) { print "KillDisconnected=" ENVIRON["TARGET_KILL"]; set_kill = 1 }
+          if (!set_limit) { print "DisconnectedTimeLimit=" ENVIRON["TARGET_LIMIT"]; set_limit = 1 }
         }
       }
       /^\[[^]]+\][ \t]*$/ {
@@ -884,14 +891,14 @@ EOF
         if (sec == "Sessions") {
           if ($0 ~ /^[#; \t]*KillDisconnected=/) {
             if (!set_kill) {
-              print "KillDisconnected=true"
+              print "KillDisconnected=" ENVIRON["TARGET_KILL"]
               set_kill = 1
             }
             next
           }
           if ($0 ~ /^[#; \t]*DisconnectedTimeLimit=/) {
             if (!set_limit) {
-              print "DisconnectedTimeLimit=60"
+              print "DisconnectedTimeLimit=" ENVIRON["TARGET_LIMIT"]
               set_limit = 1
             }
             next
@@ -904,8 +911,8 @@ EOF
         if (!saw_sessions) {
           print ""
           print "[Sessions]"
-          print "KillDisconnected=true"
-          print "DisconnectedTimeLimit=60"
+          print "KillDisconnected=" ENVIRON["TARGET_KILL"]
+          print "DisconnectedTimeLimit=" ENVIRON["TARGET_LIMIT"]
         }
       }
     ' "$sesman_ini" >"$sesman_tmp"
@@ -913,7 +920,7 @@ EOF
     if ! cmp -s "$sesman_tmp" "$sesman_ini"; then
       chmod 0644 "$sesman_tmp"
       mv -f -- "$sesman_tmp" "$sesman_ini"
-      echo "[on-connect] Updated $sesman_ini (KillDisconnected=true, DisconnectedTimeLimit=60)"
+      echo "[on-connect] Updated $sesman_ini (KillDisconnected=${target_kill}, DisconnectedTimeLimit=${target_limit})"
       pkill -HUP -x xrdp-sesman 2>/dev/null || systemctl reload xrdp-sesman 2>/dev/null || true
     else
       rm -f -- "$sesman_tmp"
@@ -1239,10 +1246,12 @@ run_serialized_system_install
 # Ensure user belongs to 'kvm' group before xrdp login so Claude Cowork's QEMU/KVM sandbox works
 ensure_user_in_kvm_group "$USERNAME"
 
-# Always sign out any previous/disconnected xrdp desktop session BEFORE writing configs
-# so xrdp-sesman starts a fresh desktop sign-in and dying panel/desktop processes cannot
-# overwrite newly written configuration files.
-terminate_user_xrdp_session "$USERNAME"
+if [[ "${ON_CONNECT_KEEP_SESSIONS_RUNNING:-true}" != "true" && "${ON_CONNECT_KEEP_SESSIONS_RUNNING:-true}" != "1" ]]; then
+  # Sign out any previous/disconnected xrdp desktop session BEFORE writing configs
+  # so xrdp-sesman starts a fresh desktop sign-in and dying panel/desktop processes cannot
+  # overwrite newly written configuration files.
+  terminate_user_xrdp_session "$USERNAME"
+fi
 
 echo "[status] Configuring LXQt desktop, wallpaper & dock launchers..."
 
@@ -1920,4 +1929,107 @@ if command -v codium >/dev/null 2>&1 && [[ -s "$CODIUM_AG_VSIX" ]]; then
       chown -R "$USER_UID:$USER_GID" -- "$HOMEDIR/.config/VSCodium" "$HOMEDIR/.vscode-oss" 2>/dev/null || true
     fi
   fi
+fi
+
+# Apply per-user Portal-provisioned API key to ~/.antigravity/settings.json and ~/.claude/settings.json
+if [[ -n "${ON_CONNECT_USER_ANTIGRAVITY_KEY:-}" && -n "${ANTIGRAVITY_URL:-}" && -f "$ANTIGRAVITY_ADMIN_SETTINGS_SRC" ]]; then
+  ensure_user_dir "$HOMEDIR/.antigravity"
+  AG_USER_TMP="$(mktemp "${TMPDIR:-/tmp}/user-ag-settings.XXXXXX")"
+  if command -v python3 >/dev/null 2>&1; then
+    TEMPLATE_PATH="$ANTIGRAVITY_ADMIN_SETTINGS_SRC" \
+    OUT_PATH="$AG_USER_TMP" \
+    AG_URL="${ANTIGRAVITY_URL}" \
+    AG_KEY="${ON_CONNECT_USER_ANTIGRAVITY_KEY}" \
+    python3 - <<'PY'
+import json, os
+
+with open(os.environ["TEMPLATE_PATH"], "r", encoding="utf-8") as f:
+    raw = f.read()
+
+url_escaped = json.dumps(os.environ["AG_URL"])[1:-1]
+key_escaped = json.dumps(os.environ["AG_KEY"])[1:-1]
+rendered = raw.replace("__ANTIGRAVITY_URL__", url_escaped).replace("__ANTIGRAVITY_KEY__", key_escaped)
+json.loads(rendered)
+with open(os.environ["OUT_PATH"], "w", encoding="utf-8") as f:
+    f.write(rendered)
+PY
+  else
+    AG_URL_ESC="$(json_escape_string "${ANTIGRAVITY_URL}")" \
+    AG_KEY_ESC="$(json_escape_string "${ON_CONNECT_USER_ANTIGRAVITY_KEY}")" \
+    awk '{ gsub(/__ANTIGRAVITY_URL__/, ENVIRON["AG_URL_ESC"]); gsub(/__ANTIGRAVITY_KEY__/, ENVIRON["AG_KEY_ESC"]); print }' \
+      "$ANTIGRAVITY_ADMIN_SETTINGS_SRC" >"$AG_USER_TMP"
+  fi
+  write_user_file "$HOMEDIR/.antigravity/settings.json" 0600 <"$AG_USER_TMP" || true
+  rm -f -- "$AG_USER_TMP"
+fi
+
+if [[ -n "${ON_CONNECT_USER_ANTHROPIC_API_KEY:-}" ]]; then
+  ensure_user_dir "$HOMEDIR/.claude"
+  CLAUDE_USER_FILE="$HOMEDIR/.claude/settings.json"
+  CLAUDE_USER_TMP="$(mktemp "${TMPDIR:-/tmp}/user-claude-settings.XXXXXX")"
+  if [[ -f "$ANTHROPIC_SETTINGS_SRC" ]] && command -v python3 >/dev/null 2>&1; then
+    TEMPLATE_PATH="$ANTHROPIC_SETTINGS_SRC" \
+    EXISTING_PATH="$CLAUDE_USER_FILE" \
+    OUT_PATH="$CLAUDE_USER_TMP" \
+    USER_API_KEY="${ON_CONNECT_USER_ANTHROPIC_API_KEY}" \
+    python3 - <<'PY'
+import json, os
+
+keys = [
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+]
+with open(os.environ["TEMPLATE_PATH"], "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+existing_path = os.environ["EXISTING_PATH"]
+if os.path.isfile(existing_path):
+    try:
+        with open(existing_path, "r", encoding="utf-8") as f:
+            existing = json.load(f)
+            if isinstance(existing, dict):
+                for k, v in existing.items():
+                    if k != "env":
+                        data.setdefault(k, v)
+                if isinstance(existing.get("env"), dict) and isinstance(data.get("env"), dict):
+                    merged_env = dict(existing["env"])
+                    merged_env.update(data["env"])
+                    data["env"] = merged_env
+    except Exception:
+        pass
+
+env_obj = data.get("env")
+if not isinstance(env_obj, dict):
+    env_obj = {}
+
+for k in keys:
+    val = os.environ["USER_API_KEY"] if k == "ANTHROPIC_API_KEY" else os.environ.get(k, "")
+    if val:
+        env_obj[k] = val
+    elif env_obj.get(k) == f"__{k}__":
+        env_obj.pop(k, None)
+
+data["env"] = env_obj
+with open(os.environ["OUT_PATH"], "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+  else
+    {
+      printf '{\n  "env": {\n    "DISABLE_AUTOUPDATER": "1",\n    "ANTHROPIC_API_KEY": "%s"' \
+        "$(json_escape_string "${ON_CONNECT_USER_ANTHROPIC_API_KEY}")"
+      for k in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_DEFAULT_OPUS_MODEL ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL; do
+        val="${!k:-}"
+        [[ -z "$val" ]] && continue
+        printf ',\n    "%s": "%s"' "$k" "$(json_escape_string "$val")"
+      done
+      printf '\n  }\n}\n'
+    } >"$CLAUDE_USER_TMP"
+  fi
+  write_user_file "$CLAUDE_USER_FILE" 0600 <"$CLAUDE_USER_TMP" || true
+  rm -f -- "$CLAUDE_USER_TMP"
 fi

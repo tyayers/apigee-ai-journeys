@@ -7,6 +7,7 @@ const state = {
   csrfToken: "",
   authSource: "",
   user: null,
+  keepSessionsRunning: true,
   rdpPassword: "",
   viewer: null,
   connecting: false,
@@ -47,6 +48,7 @@ const el = {
   cadBtn: document.getElementById("cad-btn"),
   fullscreenBtn: document.getElementById("fullscreen-btn"),
   disconnectBtn: document.getElementById("disconnect-btn"),
+  stopSessionBtn: document.getElementById("stop-session-btn"),
 
   rdpViewport: document.getElementById("rdp-viewport"),
   rdpCanvas: document.getElementById("rdp-canvas"),
@@ -220,6 +222,7 @@ function ensureRdpViewer() {
         el.rdpStatusText.textContent = detail ? `Connected · ${detail}` : "Connected";
         el.rdpConnectOverlay.hidden = true;
         el.disconnectBtn.hidden = false;
+        el.stopSessionBtn.hidden = !state.keepSessionsRunning;
         el.clipboardBtn.disabled = false;
         el.cadBtn.disabled = false;
         el.rdpReconnectBtn.textContent = "Reconnect to desktop";
@@ -388,13 +391,45 @@ async function bootstrap() {
   el.disconnectBtn.addEventListener("click", () => {
     state.viewer?.disconnect();
     el.rdpStatusDot.dataset.state = "disconnected";
+    if (state.keepSessionsRunning) {
+      el.rdpStatusText.textContent = "Disconnected";
+      el.overlayHeading.textContent = "Session paused";
+      el.overlayDesc.textContent = `Your desktop session for '${state.user?.username || ""}' is still running on the host. Reconnect to resume.`;
+      el.rdpReconnectBtn.textContent = "Resume desktop";
+      el.stopSessionBtn.hidden = false;
+    } else {
+      el.rdpStatusText.textContent = "Signed out";
+      el.overlayHeading.textContent = "Desktop signed out";
+      el.overlayDesc.textContent = `Reconnect to start a fresh desktop session for '${state.user?.username || ""}'.`;
+      el.rdpReconnectBtn.textContent = "Reconnect to desktop";
+      el.stopSessionBtn.hidden = true;
+    }
+    el.rdpConnectOverlay.hidden = false;
+    el.rdpReconnectBtn.hidden = false;
+    el.disconnectBtn.hidden = true;
+    el.clipboardBtn.disabled = true;
+    el.cadBtn.disabled = true;
+  });
+
+  el.stopSessionBtn.addEventListener("click", async () => {
+    el.stopSessionBtn.disabled = true;
+    state.viewer?.disconnect();
+    try {
+      await apiPost("/api/rdp/stop", {});
+    } catch {
+      // Best-effort
+    } finally {
+      el.stopSessionBtn.disabled = false;
+    }
+    el.rdpStatusDot.dataset.state = "disconnected";
     el.rdpStatusText.textContent = "Signed out";
-    el.overlayHeading.textContent = "Desktop signed out";
+    el.overlayHeading.textContent = "Desktop session stopped";
     el.overlayDesc.textContent = `Reconnect to start a fresh desktop session for '${state.user?.username || ""}'.`;
     el.rdpConnectOverlay.hidden = false;
     el.rdpReconnectBtn.textContent = "Reconnect to desktop";
     el.rdpReconnectBtn.hidden = false;
     el.disconnectBtn.hidden = true;
+    el.stopSessionBtn.hidden = true;
     el.clipboardBtn.disabled = true;
     el.cadBtn.disabled = true;
   });
@@ -459,6 +494,7 @@ async function bootstrap() {
   state.csrfToken = data.csrfToken;
   state.authSource = data.authSource;
   state.user = data.user;
+  state.keepSessionsRunning = data.keepSessionsRunning !== false;
   renderAuthenticatedWorkspace();
 }
 

@@ -8,6 +8,7 @@ import tls from "node:tls";
 import { deriveLinuxUsername, parseUserIdentity } from "../src/auth.ts";
 import { loadConfig } from "../src/config.ts";
 import { HostMetricsMonitor, RESOURCE_BUSY_MESSAGE, type HostMetricsProvider } from "../src/host-metrics.ts";
+import { ensurePortalCodingAgentKey } from "../src/portal.ts";
 import { createAppServer } from "../src/server.ts";
 import { parseUsersYaml, VmUserManager, type SystemUserAdapter } from "../src/vm-users.ts";
 
@@ -446,19 +447,29 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     ws.close();
     await closedPromise;
 
-    // Wait briefly for the async post-disconnect sign-out lock task to complete
-    for (let i = 0; i < 30; i++) {
-      if (
-        terminatedEvents.some(
-          (e) => e.username === "rdp_tester" && e.reason === "disconnect"
-        )
-      ) {
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 20));
-    }
+    // With KEEP_SESSIONS_RUNNING=true (default), closing the browser tab keeps the session running
+    await new Promise((r) => setTimeout(r, 50));
+    expect(
+      terminatedEvents.filter((e) => e.username === "rdp_tester").map((e) => e.reason)
+    ).toEqual(["pre-connect"]);
 
-    // Verify pre-connect reset ran before connecting AND disconnect sign-out ran on close!
+    // Explicitly stopping the session via POST /api/rdp/stop terminates the desktop session
+    const testerMeRes = await fetch(`${baseUrl}/api/me?user=rdp.tester%40example.com`);
+    const testerMeData = (await testerMeRes.json()) as {
+      csrfToken: string;
+      keepSessionsRunning: boolean;
+    };
+    expect(testerMeData.keepSessionsRunning).toBe(true);
+    const testerCookie = testerMeRes.headers.get("set-cookie")?.split(";")[0] ?? "";
+    const stopRes = await fetch(`${baseUrl}/api/rdp/stop?user=rdp.tester%40example.com`, {
+      method: "POST",
+      headers: {
+        "x-csrf-token": testerMeData.csrfToken,
+        cookie: testerCookie,
+      },
+    });
+    expect(stopRes.status).toBe(200);
+
     const testerEvents = terminatedEvents
       .filter((e) => e.username === "rdp_tester")
       .map((e) => e.reason);
@@ -488,8 +499,11 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     const wsUrl =
       baseUrl.replace("http://", "ws://") + "/api/rdp/ws?user=tabuser%40example.com";
 
-    // Open Tab 1 and wait until streaming (0x02 X.224 Confirm)
-    const ws1 = new WebSocket(wsUrl);
+    // Test auto-logout mode (KEEP_SESSIONS_RUNNING=false) with tab superseding
+    app.config.keepSessionsRunning = false;
+    try {
+      // Open Tab 1 and wait until streaming (0x02 X.224 Confirm)
+      const ws1 = new WebSocket(wsUrl);
     ws1.binaryType = "arraybuffer";
     const ws1Closed = new Promise<CloseEvent>((resolve) => {
       ws1.addEventListener("close", (ev) => resolve(ev));
@@ -559,6 +573,9 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
         .filter((e) => e.username === "tabuser")
         .map((e) => e.reason)
     ).toEqual(["pre-connect", "pre-connect", "disconnect"]);
+    } finally {
+      app.config.keepSessionsRunning = true;
+    }
   });
 
   test("on-connect.sh applies LXQt panel, wallpaper, Plank autostart, and Desktop + Plank shortcuts", async () => {
@@ -1177,5 +1194,137 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
     await runConnect();
     const logAfterSecond = await fs.readFile(installLog, "utf8");
     expect(logAfterSecond.trim().split("\n").length).toBe(1);
+  });
+
+  test("provisions per-user coding-agent-app clientId from Apigee Developer Portal and writes user AI settings", async () => {
+    const portalCalls: string[] = [];
+    const appsByEmail = new Map<string, Array<{ name: string; credentials: Array<{ clientId: string }> }>>();
+
+    const mockPortal = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch(req) {
+        const url = new URL(req.url);
+        portalCalls.push(`${req.method} ${url.pathname}`);
+
+        if (url.pathname === "/token" && req.method === "POST") {
+          const body = await req.text();
+          expect(body).toContain("grant_type=client_credentials");
+          expect(body).toContain("client_id=admin-cid");
+          expect(body).toContain("client_secret=admin-csec");
+          expect(body).toContain("scope=portal%3Aadmin");
+          return Response.json({ access_token: "portal-tok-xyz" });
+        }
+
+        const auth = req.headers.get("authorization");
+        if (auth !== "Bearer portal-tok-xyz") {
+          return new Response("Unauthorized", { status: 401 });
+        }
+
+        const loginMatch = url.pathname.match(/^\/api\/portals\/demo\/users\/([^/]+)\/login$/);
+        if (loginMatch && req.method === "POST") {
+          return Response.json({ ok: true });
+        }
+
+        const appsMatch = url.pathname.match(/^\/api\/portals\/demo\/users\/([^/]+)\/apps$/);
+        if (appsMatch) {
+          const email = decodeURIComponent(appsMatch[1]!);
+          if (req.method === "GET") {
+            return Response.json(appsByEmail.get(email) ?? []);
+          }
+          if (req.method === "POST") {
+            const payload = (await req.json()) as { name: string; apiProducts: string[] };
+            expect(payload).toEqual({
+              name: "coding-agent-app",
+              apiProducts: ["coding-agent-product"],
+            });
+            const created = {
+              name: payload.name,
+              credentials: [{ clientId: "portal-generated-client-id-999" }],
+            };
+            appsByEmail.set(email, [created]);
+            return Response.json(created, { status: 201 });
+          }
+        }
+
+        return new Response("Not found", { status: 404 });
+      },
+    });
+
+    try {
+      const portalCfg = {
+        portalHost: `http://127.0.0.1:${mockPortal.port}`,
+        portalAdminClientId: "admin-cid",
+        portalAdminClientSecret: "admin-csec",
+      };
+
+      // 1. First call creates coding-agent-app and returns clientId
+      const createdRes = await ensurePortalCodingAgentKey(portalCfg, "jane.doe@example.com");
+      expect(createdRes).toEqual({
+        apiKey: "portal-generated-client-id-999",
+        createdApp: true,
+      });
+
+      // 2. Second call finds existing coding-agent-app in GET /apps without POST /apps
+      portalCalls.length = 0;
+      const existingRes = await ensurePortalCodingAgentKey(portalCfg, "jane.doe@example.com");
+      expect(existingRes).toEqual({
+        apiKey: "portal-generated-client-id-999",
+        createdApp: false,
+      });
+      expect(portalCalls).toEqual([
+        "POST /token",
+        "POST /api/portals/demo/users/jane.doe%40example.com/login",
+        "GET /api/portals/demo/users/jane.doe%40example.com/apps",
+      ]);
+
+      // 3. on-connect.sh writes ~/.antigravity/settings.json and ~/.claude/settings.json with user's clientId
+      const portalUserTestDir = path.join(tmpDir, "portal-user-settings");
+      const mockAppsDir = path.join(portalUserTestDir, "apps");
+      const userHome = path.join(portalUserTestDir, "home");
+      await fs.mkdir(mockAppsDir, { recursive: true });
+      await fs.mkdir(userHome, { recursive: true });
+
+      const proc = Bun.spawn(
+        ["/bin/bash", path.resolve("scripts/on-connect.sh"), "janedoe", userHome],
+        {
+          env: {
+            ...process.env,
+            ON_CONNECT_APPS_DIR: mockAppsDir,
+            ANTIGRAVITY_URL: "https://ag.gateway.example.com",
+            ANTHROPIC_BASE_URL: "https://claude.gateway.example.com",
+            ON_CONNECT_USER_ANTIGRAVITY_KEY: existingRes!.apiKey,
+            ON_CONNECT_USER_ANTHROPIC_API_KEY: existingRes!.apiKey,
+          },
+          stdout: "pipe",
+          stderr: "pipe",
+        }
+      );
+      expect(await proc.exited).toBe(0);
+
+      const agUserSettings = JSON.parse(
+        await fs.readFile(path.join(userHome, ".antigravity", "settings.json"), "utf8")
+      );
+      expect(agUserSettings).toEqual({
+        gateway: {
+          enabled: true,
+          url: "https://ag.gateway.example.com",
+          apiKey: "portal-generated-client-id-999",
+        },
+      });
+
+      const claudeUserSettings = JSON.parse(
+        await fs.readFile(path.join(userHome, ".claude", "settings.json"), "utf8")
+      );
+      expect(claudeUserSettings).toEqual({
+        env: {
+          DISABLE_AUTOUPDATER: "1",
+          ANTHROPIC_BASE_URL: "https://claude.gateway.example.com",
+          ANTHROPIC_API_KEY: "portal-generated-client-id-999",
+        },
+      });
+    } finally {
+      mockPortal.stop(true);
+    }
   });
 });

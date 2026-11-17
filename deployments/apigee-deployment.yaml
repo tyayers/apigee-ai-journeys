@@ -6,24 +6,31 @@ type: deployment
 description: Enterprise AI Gateway deployment for Google Antigravity using REST-AI-Antigravity.
 templates:
   - REST-AI-Antigravity.yaml
+  - REST-AI-Messages.yaml
 products:
-  - name: antigravity-product
-    displayName: Antigravity Enterprise Product
+  - name: coding-agent-product
+    displayName: Coding Agent Product
     type: product
     gateway: apigee
     schemaVersion: 1.0.0
-    description: API Product granting access to the REST-AI-Antigravity enterprise gateway.
+    description: API Product granting access to models for coding agents.
     access: public
     approvalType: auto
     environments:
       - default-dev
     proxies:
       - REST-AI-Antigravity
+      - REST-AI-Messages
     quota: "100000"
     quotaInterval: "1"
     quotaTimeUnit: month
     operations:
       - apiSource: REST-AI-Antigravity
+        operations:
+          - name: /**
+            methods: []
+            quota: {}
+      - apiSource: REST-AI-Messages
         operations:
           - name: /**
             methods: []
@@ -45,5 +52,5 @@ users:
         description: Developer app and credential for Antigravity enterprise gateway access
         status: approved
         products:
-          - antigravity-product
+          - coding-agent-product
         credentials: []
