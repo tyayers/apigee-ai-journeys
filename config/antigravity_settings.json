@@ -4,11 +4,14 @@
     "url": "__ANTIGRAVITY_URL__",
     "apiKey": "__ANTIGRAVITY_KEY__"
   },
-  "allowedModels": [
-    "gemini-4-carbon",
-    "gemini-4-hydrogen",
-    "gemini-3.5-flash-lite"
-  ],
+  "models": {
+    "defaultModelId": "gemini-4-hydrogen",
+    "list": [
+      { "modelId": "gemini-4-hydrogen" },
+      { "modelId": "gemini-4-carbon" },
+      { "modelId": "gemini-3.1-flash-lite" }
+    ]
+  },
   "agentMode": "accept-edits",
   "artifactReviewPolicy": "always-proceed",
   "toolPermission": "always-proceed"
