@@ -255,10 +255,12 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     const prevProxy = app.config.proxyUrl;
     const prevAnalytics = app.config.analyticsUrl;
     const prevMonitoring = app.config.monitoringUrl;
+    const prevCatalog = app.config.catalogUrl;
     app.config.portalHost = "https://portal.example.com";
     app.config.proxyUrl = "https://console.cloud.google.com/apigee/proxies";
     app.config.analyticsUrl = "https://console.cloud.google.com/apigee/analytics";
     app.config.monitoringUrl = "https://console.cloud.google.com/apigee/monitoring";
+    app.config.catalogUrl = "https://console.cloud.google.com/apigee/apihub/catalog";
     try {
       const linksRes = await fetch(`${baseUrl}/api/me`, { headers: iapHeaders });
       const linksData = (await linksRes.json()) as {
@@ -269,12 +271,14 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
         { name: "Apigee Proxies", url: "https://console.cloud.google.com/apigee/proxies" },
         { name: "Apigee Analytics", url: "https://console.cloud.google.com/apigee/analytics" },
         { name: "Apigee Monitoring", url: "https://console.cloud.google.com/apigee/monitoring" },
+        { name: "Apigee Hub Catalog", url: "https://console.cloud.google.com/apigee/apihub/catalog" },
       ]);
     } finally {
       app.config.portalHost = prevPortal;
       app.config.proxyUrl = prevProxy;
       app.config.analyticsUrl = prevAnalytics;
       app.config.monitoringUrl = prevMonitoring;
+      app.config.catalogUrl = prevCatalog;
     }
 
     // Ensure CSRF is enforced on POST /api/vm-user/ensure

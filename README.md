@@ -60,6 +60,7 @@ SESSION_SECRET=replace-with-openssl-rand-hex-32
 # PROXY_URL=
 # ANALYTICS_URL=
 # MONITORING_URL=
+# CATALOG_URL=
 ```
 
 ### 3. Start the Server

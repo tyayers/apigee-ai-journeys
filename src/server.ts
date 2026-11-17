@@ -263,6 +263,9 @@ export function createAppServer(
                 ...(config.monitoringUrl
                   ? [{ name: "Apigee Monitoring", url: config.monitoringUrl }]
                   : []),
+                ...(config.catalogUrl
+                  ? [{ name: "Apigee Hub Catalog", url: config.catalogUrl }]
+                  : []),
               ],
               demos: DEMO_CATALOG,
               metrics,

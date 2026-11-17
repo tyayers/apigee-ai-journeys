@@ -26,6 +26,7 @@ export interface AppConfig {
   proxyUrl: string | null;
   analyticsUrl: string | null;
   monitoringUrl: string | null;
+  catalogUrl: string | null;
   usersFile: string;
   dataDir: string;
   configDir: string;
@@ -107,6 +108,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     proxyUrl: env.PROXY_URL?.trim() || null,
     analyticsUrl: env.ANALYTICS_URL?.trim() || null,
     monitoringUrl: env.MONITORING_URL?.trim() || null,
+    catalogUrl: env.CATALOG_URL?.trim() || null,
     usersFile,
     dataDir: env.DATA_DIR ? path.resolve(env.DATA_DIR) : path.join(baseDir, "data"),
     configDir: path.join(baseDir, "config"),
