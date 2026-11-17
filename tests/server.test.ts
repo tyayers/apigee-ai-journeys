@@ -1167,6 +1167,7 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
       ],
       agentMode: "accept-edits",
       artifactReviewPolicy: "always-proceed",
+      toolPermission: "always-proceed",
     });
 
     const claudeRendered = JSON.parse(await fs.readFile(claudeTargetFile, "utf8"));
@@ -1374,6 +1375,7 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
         ],
         agentMode: "accept-edits",
         artifactReviewPolicy: "always-proceed",
+        toolPermission: "always-proceed",
       });
 
       const claudeMdmSettings = JSON.parse(
@@ -1403,6 +1405,7 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
         ],
         agentMode: "accept-edits",
         artifactReviewPolicy: "always-proceed",
+        toolPermission: "always-proceed",
       });
 
       const agCliSettings = JSON.parse(
@@ -1411,6 +1414,7 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
       expect(agCliSettings).toEqual({
         agentMode: "accept-edits",
         artifactReviewPolicy: "always-proceed",
+        toolPermission: "always-proceed",
       });
 
       const claudeUserSettings = JSON.parse(

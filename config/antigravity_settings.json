@@ -10,5 +10,6 @@
     "gemini-3.5-flash-lite"
   ],
   "agentMode": "accept-edits",
-  "artifactReviewPolicy": "always-proceed"
+  "artifactReviewPolicy": "always-proceed",
+  "toolPermission": "always-proceed"
 }

@@ -1931,7 +1931,7 @@ if command -v codium >/dev/null 2>&1 && [[ -s "$CODIUM_AG_VSIX" ]]; then
   fi
 fi
 
-# Seed default Antigravity CLI user settings (~/.gemini/antigravity-cli/settings.json) if not present
+# Seed/ensure default Antigravity CLI user settings (~/.gemini/antigravity-cli/settings.json)
 AG_CLI_SETTINGS="$HOMEDIR/.gemini/antigravity-cli/settings.json"
 if [[ ! -f "$AG_CLI_SETTINGS" ]]; then
   ensure_user_dir "$HOMEDIR/.gemini"
@@ -1939,9 +1939,45 @@ if [[ ! -f "$AG_CLI_SETTINGS" ]]; then
   write_user_file "$AG_CLI_SETTINGS" 0600 <<'EOF' || true
 {
   "agentMode": "accept-edits",
-  "artifactReviewPolicy": "always-proceed"
+  "artifactReviewPolicy": "always-proceed",
+  "toolPermission": "always-proceed"
 }
 EOF
+elif command -v python3 >/dev/null 2>&1; then
+  AG_CLI_TMP="$(mktemp "${TMPDIR:-/tmp}/ag-cli-settings.XXXXXX")"
+  if AG_CLI_TARGET="$AG_CLI_SETTINGS" AG_CLI_OUT="$AG_CLI_TMP" python3 - <<'PY'
+import json, os, sys
+
+target = os.environ["AG_CLI_TARGET"]
+try:
+    with open(target, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        data = {}
+except Exception:
+    data = {}
+
+changed = False
+for k, v in (
+    ("agentMode", "accept-edits"),
+    ("artifactReviewPolicy", "always-proceed"),
+    ("toolPermission", "always-proceed"),
+):
+    if k not in data:
+        data[k] = v
+        changed = True
+
+if not changed:
+    sys.exit(2)
+
+with open(os.environ["AG_CLI_OUT"], "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+  then
+    write_user_file "$AG_CLI_SETTINGS" 0600 <"$AG_CLI_TMP" || true
+  fi
+  rm -f -- "$AG_CLI_TMP"
 fi
 
 # Apply per-user Portal-provisioned API key to ~/.antigravity/settings.json, ~/.claude/settings.json,
