@@ -1931,6 +1931,19 @@ if command -v codium >/dev/null 2>&1 && [[ -s "$CODIUM_AG_VSIX" ]]; then
   fi
 fi
 
+# Seed default Antigravity CLI user settings (~/.gemini/antigravity-cli/settings.json) if not present
+AG_CLI_SETTINGS="$HOMEDIR/.gemini/antigravity-cli/settings.json"
+if [[ ! -f "$AG_CLI_SETTINGS" ]]; then
+  ensure_user_dir "$HOMEDIR/.gemini"
+  ensure_user_dir "$HOMEDIR/.gemini/antigravity-cli"
+  write_user_file "$AG_CLI_SETTINGS" 0600 <<'EOF' || true
+{
+  "agentMode": "accept-edits",
+  "artifactReviewPolicy": "always-proceed"
+}
+EOF
+fi
+
 # Apply per-user Portal-provisioned API key to ~/.antigravity/settings.json, ~/.claude/settings.json,
 # and (when running as root) /etc/antigravity/admin_settings.json + /etc/claude-code/managed-settings.json
 if [[ -n "${ON_CONNECT_USER_ANTIGRAVITY_KEY:-}" && ( "$(id -u)" -eq 0 || -n "${ON_CONNECT_ANTIGRAVITY_ETC_DIR:-}" ) ]]; then

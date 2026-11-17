@@ -3,5 +3,12 @@
     "enabled": true,
     "url": "__ANTIGRAVITY_URL__",
     "apiKey": "__ANTIGRAVITY_KEY__"
-  }
+  },
+  "allowedModels": [
+    "gemini-4-carbon",
+    "gemini-4-hydrogen",
+    "gemini-3.5-flash-lite"
+  ],
+  "agentMode": "accept-edits",
+  "artifactReviewPolicy": "always-proceed"
 }

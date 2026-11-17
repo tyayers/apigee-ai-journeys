@@ -1160,6 +1160,13 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
         url: "https://gateway.example.com/v1?a=1&b=2",
         apiKey: 'ag-key-"special"\\test',
       },
+      allowedModels: [
+        "gemini-4-carbon",
+        "gemini-4-hydrogen",
+        "gemini-3.5-flash-lite",
+      ],
+      agentMode: "accept-edits",
+      artifactReviewPolicy: "always-proceed",
     });
 
     const claudeRendered = JSON.parse(await fs.readFile(claudeTargetFile, "utf8"));
@@ -1360,6 +1367,13 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           url: "https://ag.gateway.example.com",
           apiKey: "portal-generated-client-id-999",
         },
+        allowedModels: [
+          "gemini-4-carbon",
+          "gemini-4-hydrogen",
+          "gemini-3.5-flash-lite",
+        ],
+        agentMode: "accept-edits",
+        artifactReviewPolicy: "always-proceed",
       });
 
       const claudeMdmSettings = JSON.parse(
@@ -1382,6 +1396,21 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           url: "https://ag.gateway.example.com",
           apiKey: "portal-generated-client-id-999",
         },
+        allowedModels: [
+          "gemini-4-carbon",
+          "gemini-4-hydrogen",
+          "gemini-3.5-flash-lite",
+        ],
+        agentMode: "accept-edits",
+        artifactReviewPolicy: "always-proceed",
+      });
+
+      const agCliSettings = JSON.parse(
+        await fs.readFile(path.join(userHome, ".gemini", "antigravity-cli", "settings.json"), "utf8")
+      );
+      expect(agCliSettings).toEqual({
+        agentMode: "accept-edits",
+        artifactReviewPolicy: "always-proceed",
       });
 
       const claudeUserSettings = JSON.parse(
