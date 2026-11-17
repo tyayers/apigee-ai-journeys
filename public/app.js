@@ -41,6 +41,8 @@ const el = {
   sidebarVmHome: document.getElementById("sidebar-vm-home"),
   sidebarCpuAvg: document.getElementById("sidebar-cpu-avg"),
   sidebarMemUsed: document.getElementById("sidebar-mem-used"),
+  navLinksList: document.getElementById("nav-links-list"),
+  navLinksEmpty: document.getElementById("nav-links-empty"),
 
   rdpStatusDot: document.getElementById("rdp-status-dot"),
   rdpStatusText: document.getElementById("rdp-status-text"),
@@ -149,17 +151,11 @@ async function apiPost(path, payload) {
   return data;
 }
 
-function formatGiB(bytes) {
-  return (bytes / (1024 * 1024 * 1024)).toFixed(1);
-}
-
 function renderHostMetrics(metrics) {
   if (!metrics) return;
   const cpuNow = Math.round(metrics.cpuCurrentPercent);
   const cpu5m = Number(metrics.cpuAvg5mPercent).toFixed(1);
   const memPct = Math.round(metrics.memUsedPercent);
-  const usedGiB = formatGiB(metrics.memUsedBytes);
-  const totalGiB = formatGiB(metrics.memTotalBytes);
 
   if (el.metricCpuPill) {
     el.metricCpuPill.dataset.overloaded = metrics.overloaded ? "true" : "false";
@@ -168,13 +164,63 @@ function renderHostMetrics(metrics) {
       : `CPU ${cpuNow}% · 5m ${cpu5m}%`;
   }
   if (el.metricMemPill) {
-    el.metricMemPill.textContent = `MEM ${memPct}% (${usedGiB}/${totalGiB} GB)`;
+    el.metricMemPill.textContent = `MEM ${memPct}%`;
   }
   if (el.sidebarCpuAvg) {
     el.sidebarCpuAvg.textContent = `${cpu5m}% (now ${cpuNow}%)`;
   }
   if (el.sidebarMemUsed) {
-    el.sidebarMemUsed.textContent = `${usedGiB} / ${totalGiB} GB (${memPct}%)`;
+    el.sidebarMemUsed.textContent = `${memPct}%`;
+  }
+}
+
+function renderSidebarLinks(links) {
+  if (!el.navLinksList) return;
+  el.navLinksList.replaceChildren();
+  const validLinks = Array.isArray(links)
+    ? links.filter((item) => item && typeof item.name === "string" && typeof item.url === "string" && item.url)
+    : [];
+
+  if (validLinks.length === 0) {
+    if (el.navLinksEmpty) el.navLinksEmpty.hidden = false;
+    return;
+  }
+  if (el.navLinksEmpty) el.navLinksEmpty.hidden = true;
+
+  for (const item of validLinks) {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.className = "nav-link-btn";
+    a.href = item.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+
+    const label = document.createElement("span");
+    label.className = "nav-link-label";
+    label.textContent = item.name;
+
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("width", "14");
+    icon.setAttribute("height", "14");
+    icon.setAttribute("fill", "none");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "1.75");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("stroke-linejoin", "round");
+    icon.setAttribute("aria-hidden", "true");
+    icon.classList.add("nav-link-icon");
+    const path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path1.setAttribute("d", "M15 3h6v6");
+    const path2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path2.setAttribute("d", "M10 14 21 3");
+    const path3 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path3.setAttribute("d", "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6");
+    icon.append(path1, path2, path3);
+
+    a.append(label, icon);
+    li.append(a);
+    el.navLinksList.append(li);
   }
 }
 
@@ -495,6 +541,7 @@ async function bootstrap() {
   state.authSource = data.authSource;
   state.user = data.user;
   state.keepSessionsRunning = data.keepSessionsRunning !== false;
+  renderSidebarLinks(data.links);
   renderAuthenticatedWorkspace();
 }
 

@@ -23,6 +23,9 @@ export interface AppConfig {
   portalHost: string | null;
   portalAdminClientId: string | null;
   portalAdminClientSecret: string | null;
+  proxyUrl: string | null;
+  analyticsUrl: string | null;
+  monitoringUrl: string | null;
   usersFile: string;
   dataDir: string;
   configDir: string;
@@ -101,6 +104,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     portalHost: env.PORTAL_HOST?.trim().replace(/\/+$/, "") || null,
     portalAdminClientId: env.PORTAL_ADMIN_CLIENT_ID?.trim() || null,
     portalAdminClientSecret: env.PORTAL_ADMIN_CLIENT_SECRET?.trim() || null,
+    proxyUrl: env.PROXY_URL?.trim() || null,
+    analyticsUrl: env.ANALYTICS_URL?.trim() || null,
+    monitoringUrl: env.MONITORING_URL?.trim() || null,
     usersFile,
     dataDir: env.DATA_DIR ? path.resolve(env.DATA_DIR) : path.join(baseDir, "data"),
     configDir: path.join(baseDir, "config"),

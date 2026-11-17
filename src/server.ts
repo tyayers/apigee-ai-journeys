@@ -252,6 +252,18 @@ export function createAppServer(
                 username: resolved.session.username,
               },
               keepSessionsRunning: config.keepSessionsRunning,
+              links: [
+                ...(config.portalHost
+                  ? [{ name: "Apigee AI Portal", url: `${config.portalHost}/portal` }]
+                  : []),
+                ...(config.proxyUrl ? [{ name: "Apigee Proxies", url: config.proxyUrl }] : []),
+                ...(config.analyticsUrl
+                  ? [{ name: "Apigee Analytics", url: config.analyticsUrl }]
+                  : []),
+                ...(config.monitoringUrl
+                  ? [{ name: "Apigee Monitoring", url: config.monitoringUrl }]
+                  : []),
+              ],
               demos: DEMO_CATALOG,
               metrics,
             },

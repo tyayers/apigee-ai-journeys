@@ -56,6 +56,10 @@ SESSION_SECRET=replace-with-openssl-rand-hex-32
 # PORTAL_HOST=https://your-apigee-portal-host.example.com
 # PORTAL_ADMIN_CLIENT_ID=
 # PORTAL_ADMIN_CLIENT_SECRET=
+# Optional: sidebar links (in addition to Apigee AI Portal at $PORTAL_HOST/portal)
+# PROXY_URL=
+# ANALYTICS_URL=
+# MONITORING_URL=
 ```
 
 ### 3. Start the Server

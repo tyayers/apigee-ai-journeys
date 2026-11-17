@@ -1931,7 +1931,15 @@ if command -v codium >/dev/null 2>&1 && [[ -s "$CODIUM_AG_VSIX" ]]; then
   fi
 fi
 
-# Apply per-user Portal-provisioned API key to ~/.antigravity/settings.json and ~/.claude/settings.json
+# Apply per-user Portal-provisioned API key to ~/.antigravity/settings.json, ~/.claude/settings.json,
+# and (when running as root) /etc/antigravity/admin_settings.json + /etc/claude-code/managed-settings.json
+if [[ -n "${ON_CONNECT_USER_ANTIGRAVITY_KEY:-}" && ( "$(id -u)" -eq 0 || -n "${ON_CONNECT_ANTIGRAVITY_ETC_DIR:-}" ) ]]; then
+  ANTIGRAVITY_KEY="${ON_CONNECT_USER_ANTIGRAVITY_KEY}" configure_antigravity_admin_settings
+fi
+if [[ -n "${ON_CONNECT_USER_ANTHROPIC_API_KEY:-}" && ( "$(id -u)" -eq 0 || -n "${ON_CONNECT_CLAUDE_ETC_DIR:-}" ) ]]; then
+  ANTHROPIC_API_KEY="${ON_CONNECT_USER_ANTHROPIC_API_KEY}" configure_anthropic_managed_settings
+fi
+
 if [[ -n "${ON_CONNECT_USER_ANTIGRAVITY_KEY:-}" && -n "${ANTIGRAVITY_URL:-}" && -f "$ANTIGRAVITY_ADMIN_SETTINGS_SRC" ]]; then
   ensure_user_dir "$HOMEDIR/.antigravity"
   AG_USER_TMP="$(mktemp "${TMPDIR:-/tmp}/user-ag-settings.XXXXXX")"

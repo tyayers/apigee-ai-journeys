@@ -193,6 +193,8 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     const html = await res.text();
     expect(html).toContain("<title>Apigee AI Journeys</title>");
     expect(html).not.toContain("Fit display");
+    expect(html).toContain('<div class="nav-heading">Links</div>');
+    expect(html).not.toContain("Demo Cases");
     expect(html).not.toContain("{{CSP_NONCE}}");
 
     const headRoot = await fetch(`${baseUrl}/`, { method: "HEAD" });
@@ -246,6 +248,34 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     expect(iapMe.authenticated).toBe(true);
     expect(iapMe.authSource).toBe("iap");
     expect(iapMe.user.username).toBe("alice_smith");
+    expect(Array.isArray(iapMe.links)).toBe(true);
+
+    // Verify /api/me returns configured sidebar links
+    const prevPortal = app.config.portalHost;
+    const prevProxy = app.config.proxyUrl;
+    const prevAnalytics = app.config.analyticsUrl;
+    const prevMonitoring = app.config.monitoringUrl;
+    app.config.portalHost = "https://portal.example.com";
+    app.config.proxyUrl = "https://console.cloud.google.com/apigee/proxies";
+    app.config.analyticsUrl = "https://console.cloud.google.com/apigee/analytics";
+    app.config.monitoringUrl = "https://console.cloud.google.com/apigee/monitoring";
+    try {
+      const linksRes = await fetch(`${baseUrl}/api/me`, { headers: iapHeaders });
+      const linksData = (await linksRes.json()) as {
+        links: Array<{ name: string; url: string }>;
+      };
+      expect(linksData.links).toEqual([
+        { name: "Apigee AI Portal", url: "https://portal.example.com/portal" },
+        { name: "Apigee Proxies", url: "https://console.cloud.google.com/apigee/proxies" },
+        { name: "Apigee Analytics", url: "https://console.cloud.google.com/apigee/analytics" },
+        { name: "Apigee Monitoring", url: "https://console.cloud.google.com/apigee/monitoring" },
+      ]);
+    } finally {
+      app.config.portalHost = prevPortal;
+      app.config.proxyUrl = prevProxy;
+      app.config.analyticsUrl = prevAnalytics;
+      app.config.monitoringUrl = prevMonitoring;
+    }
 
     // Ensure CSRF is enforced on POST /api/vm-user/ensure
     const noCsrf = await fetch(`${baseUrl}/api/vm-user/ensure`, {
@@ -1278,12 +1308,25 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
         "GET /api/portals/demo/users/jane.doe%40example.com/apps",
       ]);
 
-      // 3. on-connect.sh writes ~/.antigravity/settings.json and ~/.claude/settings.json with user's clientId
+      // 3. on-connect.sh updates both /etc/* MDM files (overwriting stale keys) and ~/.antigravity + ~/.claude settings
       const portalUserTestDir = path.join(tmpDir, "portal-user-settings");
       const mockAppsDir = path.join(portalUserTestDir, "apps");
+      const mockAgEtcDir = path.join(portalUserTestDir, "etc-antigravity");
+      const mockClaudeEtcDir = path.join(portalUserTestDir, "etc-claude-code");
       const userHome = path.join(portalUserTestDir, "home");
       await fs.mkdir(mockAppsDir, { recursive: true });
+      await fs.mkdir(mockAgEtcDir, { recursive: true });
+      await fs.mkdir(mockClaudeEtcDir, { recursive: true });
       await fs.mkdir(userHome, { recursive: true });
+
+      await fs.writeFile(
+        path.join(mockAgEtcDir, "admin_settings.json"),
+        JSON.stringify({ gateway: { enabled: true, url: "https://old.example.com", apiKey: "stale-old-key" } })
+      );
+      await fs.writeFile(
+        path.join(mockClaudeEtcDir, "managed-settings.json"),
+        JSON.stringify({ env: { DISABLE_AUTOUPDATER: "1", ANTHROPIC_API_KEY: "stale-old-key" } })
+      );
 
       const proc = Bun.spawn(
         ["/bin/bash", path.resolve("scripts/on-connect.sh"), "janedoe", userHome],
@@ -1291,6 +1334,8 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           env: {
             ...process.env,
             ON_CONNECT_APPS_DIR: mockAppsDir,
+            ON_CONNECT_ANTIGRAVITY_ETC_DIR: mockAgEtcDir,
+            ON_CONNECT_CLAUDE_ETC_DIR: mockClaudeEtcDir,
             ANTIGRAVITY_URL: "https://ag.gateway.example.com",
             ANTHROPIC_BASE_URL: "https://claude.gateway.example.com",
             ON_CONNECT_USER_ANTIGRAVITY_KEY: existingRes!.apiKey,
@@ -1301,6 +1346,28 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
         }
       );
       expect(await proc.exited).toBe(0);
+
+      const agMdmSettings = JSON.parse(
+        await fs.readFile(path.join(mockAgEtcDir, "admin_settings.json"), "utf8")
+      );
+      expect(agMdmSettings).toEqual({
+        gateway: {
+          enabled: true,
+          url: "https://ag.gateway.example.com",
+          apiKey: "portal-generated-client-id-999",
+        },
+      });
+
+      const claudeMdmSettings = JSON.parse(
+        await fs.readFile(path.join(mockClaudeEtcDir, "managed-settings.json"), "utf8")
+      );
+      expect(claudeMdmSettings).toEqual({
+        env: {
+          DISABLE_AUTOUPDATER: "1",
+          ANTHROPIC_BASE_URL: "https://claude.gateway.example.com",
+          ANTHROPIC_API_KEY: "portal-generated-client-id-999",
+        },
+      });
 
       const agUserSettings = JSON.parse(
         await fs.readFile(path.join(userHome, ".antigravity", "settings.json"), "utf8")
