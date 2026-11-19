@@ -72,18 +72,30 @@ export function isPortalConfigured(config: Pick<AppConfig, "portalHost" | "porta
 export function deriveDesktopAppName(email: string): string {
   const local = (email.split("@")[0] ?? "user").trim().toLowerCase();
   const safeName = local.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "user";
-  return `${safeName}-desktop-app`;
+  return `${safeName}-desktop-access`;
+}
+
+export function deriveDesktopAppDisplayName(email: string): string {
+  const local = (email.split("@")[0] ?? "user").trim();
+  const words = local
+    .split(/[^a-zA-Z0-9]+/)
+    .map((w) => w.trim())
+    .filter(Boolean)
+    .map((w) => w[0]!.toUpperCase() + w.slice(1));
+  const label = words.length > 0 ? words.join(" ") : "User";
+  return `${label} Desktop Access`;
 }
 
 /**
- * Ensures the user exists in the Apigee Developer Portal and has a `{Name}-desktop-app`
- * subscribed to `coding-agent-product`, returning its `clientId` API key.
+ * Ensures the user exists in the Apigee Developer Portal and has a `{Name}-desktop-access`
+ * app subscribed to `coding-agent-product`, returning its `clientId` API key.
  */
 export async function ensurePortalCodingAgentKey(
   config: Pick<AppConfig, "portalHost" | "portalAdminClientId" | "portalAdminClientSecret">,
   userEmail: string,
   appName = deriveDesktopAppName(userEmail),
-  apiProduct = "coding-agent-product"
+  apiProduct = "coding-agent-product",
+  displayName = deriveDesktopAppDisplayName(userEmail)
 ): Promise<PortalProvisionResult | null> {
   if (!isPortalConfigured(config)) {
     return null;
@@ -152,12 +164,13 @@ export async function ensurePortalCodingAgentKey(
     return { apiKey: existingKey, createdApp: false };
   }
 
-  // 4. POST App (create coding-agent-app subscribed to coding-agent-product)
+  // 4. POST App (create {Name}-desktop-access subscribed to coding-agent-product)
   const createRes = await fetch(`${host}/api/portals/demo/users/${encodedEmail}/apps`, {
     method: "POST",
     headers: authHeaders,
     body: JSON.stringify({
       name: appName,
+      displayName,
       apiProducts: [apiProduct],
     }),
   });

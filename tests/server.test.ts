@@ -1312,9 +1312,14 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
             return Response.json(appsByEmail.get(email) ?? []);
           }
           if (req.method === "POST") {
-            const payload = (await req.json()) as { name: string; apiProducts: string[] };
+            const payload = (await req.json()) as {
+              name: string;
+              displayName: string;
+              apiProducts: string[];
+            };
             expect(payload).toEqual({
-              name: "jane-doe-desktop-app",
+              name: "jane-doe-desktop-access",
+              displayName: "Jane Doe Desktop Access",
               apiProducts: ["coding-agent-product"],
             });
             const created = {
