@@ -106,10 +106,10 @@ sudo ./scripts/systemd-service.sh deregister
 
 ```bash
 # Deploy to Apigee X
-aft deployments/antigravity-deployment.yaml --project <your-gcp-project> --environment <env>
+aft deployments/apigee-deployment.yaml --project <your-gcp-project> --environment <env>
 
 # Or deploy to an Apigee Emulator
-aft deployments/antigravity-deployment.yaml -f emulator -o http://localhost:8083 -e default-dev
+aft deployments/apigee-deployment.yaml -f emulator -o http://localhost:8083 -e default-dev
 ```
 
 Because `antigravity-app` leaves `credentials: []` empty in `deployments/antigravity-deployment.yaml`, Apigee automatically generates a secure consumer key/secret on creation. After deploying:

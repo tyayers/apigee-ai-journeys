@@ -834,14 +834,23 @@ apply_keyboard_layouts() {
   fi
 }
 
+disable_screensaver() {
+  if command -v xset >/dev/null 2>&1; then
+    xset s off -dpms s noblank 2>/dev/null || true
+  fi
+  pkill -u "$(id -u)" -x xscreensaver 2>/dev/null || true
+}
+
 apply_trust
 apply_keyboard_layouts
+disable_screensaver
 ensure_panel_running
 if [[ "${1:-}" != "--Immediate" ]]; then
   (
     sleep 2
     apply_trust
     apply_keyboard_layouts
+    disable_screensaver
   ) </dev/null >/dev/null 2>&1 &
 fi
 EOF
@@ -1556,7 +1565,6 @@ launcher_icon_theme = Adwaita
 launcher_icon_theme_override = 0
 startup_notifications = 1
 launcher_tooltip = 1
-launcher_item_app = $CHROME_DESKTOP_PATH
 launcher_item_app = $HOME_LAUNCHER_PATH
 launcher_item_app = $ANTIGRAVITY_DESKTOP_PATH
 launcher_item_app = $CLAUDE_DESKTOP_PATH
@@ -1809,6 +1817,14 @@ Hidden=false
 NoDisplay=true
 EOF
 
+XSCREENSAVER_AUTOSTART="$HOMEDIR/.config/autostart/xscreensaver.desktop"
+write_user_file "$XSCREENSAVER_AUTOSTART" 0644 <<'EOF' || true
+[Desktop Entry]
+Type=Application
+Name=XScreenSaver
+Hidden=true
+EOF
+
 rm -f -- "$HOMEDIR/.config/autostart/gxkb.desktop"
 
 SESSION_INIT_AUTOSTART="$HOMEDIR/.config/autostart/apigee-session-init.desktop"
@@ -1882,7 +1898,7 @@ write_desktop_shortcut() {
 
 write_desktop_shortcut "$TERM_DESKTOP_PATH" "$DESKTOP_DIR/qterminal.desktop" "Terminal"
 write_desktop_shortcut "$CHROME_DESKTOP_PATH" "$DESKTOP_DIR/google-chrome.desktop"
-write_desktop_shortcut "$CODIUM_DESKTOP_PATH" "$DESKTOP_DIR/codium.desktop" "VSCodium"
+write_desktop_shortcut "$CODIUM_DESKTOP_PATH" "$DESKTOP_DIR/codium.desktop" "VSCode"
 write_desktop_shortcut "$ANTIGRAVITY_DESKTOP_PATH" "$DESKTOP_DIR/antigravity.desktop" "Antigravity"
 write_desktop_shortcut "$CLAUDE_DESKTOP_PATH" "$DESKTOP_DIR/claude.desktop" "Claude"
 write_desktop_shortcut "$CONFIG_DESKTOP_PATH" "$DESKTOP_DIR/lxqt-config.desktop" "Settings" "preferences-desktop"

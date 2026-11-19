@@ -722,7 +722,6 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     expect(tint2Conf).toContain("launcher_icon_size = 48");
     expect(tint2Conf).toContain(
       [
-        `launcher_item_app = ${path.join(mockAppsDir, "google-chrome.desktop")}`,
         `launcher_item_app = ${path.join(mockAppsDir, "apigee-user-home.desktop")}`,
         `launcher_item_app = ${path.join(mockAppsDir, "antigravity.desktop")}`,
         `launcher_item_app = ${path.join(mockAppsDir, "com.anthropic.Claude.desktop")}`,
@@ -730,7 +729,13 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
         `launcher_item_app = ${path.join(freshHome, ".local", "share", "applications", "apigee-settings.desktop")}`,
       ].join("\n")
     );
+    expect(tint2Conf).not.toContain("google-chrome.desktop");
     expect(tint2Conf).not.toContain("featherpad.desktop");
+    const xscreensaverAutostart = await fs.readFile(
+      path.join(autostartDir, "xscreensaver.desktop"),
+      "utf8"
+    );
+    expect(xscreensaverAutostart).toContain("Hidden=true");
     const settingsLauncher = await fs.readFile(
       path.join(freshHome, ".local", "share", "applications", "apigee-settings.desktop"),
       "utf8"
@@ -773,7 +778,7 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
       {
         shortcutFile: "codium.desktop",
         sourceAppFile: "codium.desktop",
-        expectedTitle: "VSCodium",
+        expectedTitle: "VSCode",
       },
       {
         shortcutFile: "antigravity.desktop",
@@ -850,7 +855,7 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
       path.join(fallbackHome, "Desktop", "codium.desktop"),
       "utf8"
     );
-    expect(bobCodiumDesktop).toContain("Name=VSCodium\n");
+    expect(bobCodiumDesktop).toContain("Name=VSCode\n");
     expect(bobCodiumDesktop).toContain(`URL=${path.join(emptyAppsDir, "zzz-custom-codium.desktop")}`);
     expect(bobCodiumDesktop).not.toContain("codium-url-handler.desktop");
     const bobClaudeDesktop = await fs.readFile(
@@ -1165,7 +1170,7 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
         list: [
           { modelId: "gemini-4-hydrogen" },
           { modelId: "gemini-4-carbon" },
-          { modelId: "gemini-3.1-flash-lite" },
+          { modelId: "gemini-3.5-flash-lite" },
         ],
       },
       agentMode: "accept-edits",
@@ -1376,7 +1381,7 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           list: [
             { modelId: "gemini-4-hydrogen" },
             { modelId: "gemini-4-carbon" },
-            { modelId: "gemini-3.1-flash-lite" },
+            { modelId: "gemini-3.5-flash-lite" },
           ],
         },
         agentMode: "accept-edits",
@@ -1409,7 +1414,7 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           list: [
             { modelId: "gemini-4-hydrogen" },
             { modelId: "gemini-4-carbon" },
-            { modelId: "gemini-3.1-flash-lite" },
+            { modelId: "gemini-3.5-flash-lite" },
           ],
         },
         agentMode: "accept-edits",
