@@ -18,8 +18,10 @@ DEFAULT_WALLPAPER_SRC="$SCRIPT_DIR/../public/wallpaper.jpg"
 WALLPAPER_SRC="${ON_CONNECT_WALLPAPER_SRC:-$DEFAULT_WALLPAPER_SRC}"
 DEFAULT_ANTIGRAVITY_ADMIN_SETTINGS_SRC="$SCRIPT_DIR/../config/antigravity_settings.json"
 ANTIGRAVITY_ADMIN_SETTINGS_SRC="${ON_CONNECT_ANTIGRAVITY_ADMIN_SETTINGS_SRC:-$DEFAULT_ANTIGRAVITY_ADMIN_SETTINGS_SRC}"
-DEFAULT_ANTHROPIC_SETTINGS_SRC="$SCRIPT_DIR/../config/anthropic_settings.json"
+DEFAULT_ANTHROPIC_SETTINGS_SRC="$SCRIPT_DIR/../config/claude_code_settings.json"
 ANTHROPIC_SETTINGS_SRC="${ON_CONNECT_ANTHROPIC_SETTINGS_SRC:-$DEFAULT_ANTHROPIC_SETTINGS_SRC}"
+DEFAULT_CLAUDE_DESKTOP_SETTINGS_SRC="$SCRIPT_DIR/../config/claude_desktop_settings.json"
+CLAUDE_DESKTOP_SETTINGS_SRC="${ON_CONNECT_CLAUDE_DESKTOP_SETTINGS_SRC:-$DEFAULT_CLAUDE_DESKTOP_SETTINGS_SRC}"
 APPS_DIR="${ON_CONNECT_APPS_DIR:-/usr/share/applications}"
 
 parse_json_string() {
@@ -298,6 +300,64 @@ PY
   echo "[on-connect] Configured Antigravity enterprise gateway -> ${target_file}"
 }
 
+configure_claude_desktop_managed_settings() {
+  local claude_desktop_etc_dir="${ON_CONNECT_CLAUDE_DESKTOP_ETC_DIR:-/etc/claude-desktop}"
+  local target_file="${claude_desktop_etc_dir}/managed-settings.json"
+  local gw_url="${ANTHROPIC_BASE_URL:-}"
+  local gw_key="${ANTHROPIC_API_KEY:-}"
+
+  if [[ -z "$gw_url" || -z "$gw_key" ]]; then
+    return 0
+  fi
+
+  if [[ ! -f "$CLAUDE_DESKTOP_SETTINGS_SRC" ]]; then
+    echo "[on-connect] Warning: Claude Desktop settings template not found at $CLAUDE_DESKTOP_SETTINGS_SRC" >&2
+    return 0
+  fi
+
+  install -d -m 0755 "$claude_desktop_etc_dir"
+  local tmp_out
+  tmp_out="$(mktemp "${TMPDIR:-/tmp}/claude-desktop-managed-settings.XXXXXX")"
+
+  if command -v python3 >/dev/null 2>&1; then
+    TEMPLATE_PATH="$CLAUDE_DESKTOP_SETTINGS_SRC" \
+    OUT_PATH="$tmp_out" \
+    GW_URL="$gw_url" \
+    GW_KEY="$gw_key" \
+    python3 - <<'PY'
+import json, os
+
+with open(os.environ["TEMPLATE_PATH"], "r", encoding="utf-8") as f:
+    raw = f.read()
+
+url_escaped = json.dumps(os.environ["GW_URL"])[1:-1]
+key_escaped = json.dumps(os.environ["GW_KEY"])[1:-1]
+rendered = raw.replace("__ANTHROPIC_BASE_URL__", url_escaped).replace("__ANTHROPIC_API_KEY__", key_escaped)
+json.loads(rendered)
+with open(os.environ["OUT_PATH"], "w", encoding="utf-8") as f:
+    f.write(rendered)
+PY
+  else
+    local url_escaped key_escaped
+    url_escaped="$(json_escape_string "$gw_url")"
+    key_escaped="$(json_escape_string "$gw_key")"
+    GW_URL_ESC="$url_escaped" GW_KEY_ESC="$key_escaped" awk '
+      {
+        gsub(/__ANTHROPIC_BASE_URL__/, ENVIRON["GW_URL_ESC"])
+        gsub(/__ANTHROPIC_API_KEY__/, ENVIRON["GW_KEY_ESC"])
+        print
+      }
+    ' "$CLAUDE_DESKTOP_SETTINGS_SRC" >"$tmp_out"
+  fi
+
+  chmod 0644 "$tmp_out"
+  if [[ "$(id -u)" -eq 0 ]]; then
+    chown root:root -- "$tmp_out"
+  fi
+  mv -f -- "$tmp_out" "$target_file"
+  echo "[on-connect] Configured Claude Desktop managed settings -> ${target_file}"
+}
+
 find_existing_desktop() {
   local cand
   for cand in "$@"; do
@@ -481,6 +541,7 @@ EOF
     /usr/local/share/antigravity \
     /usr/local/share/claude-code \
     /etc/claude-code \
+    /etc/claude-desktop \
     /etc/antigravity \
     /usr/share/pixmaps \
     /usr/share/icons/hicolor/256x256/apps \
@@ -488,6 +549,7 @@ EOF
     /usr/share/backgrounds
 
   configure_antigravity_admin_settings
+  configure_claude_desktop_managed_settings
 
   # Shared official Antigravity icon (installed into both pixmaps and hicolor theme for QIcon::fromTheme)
   if [[ ! -s /usr/share/pixmaps/antigravity.png ]]; then
@@ -1186,6 +1248,7 @@ fi
 if [[ "${1:-}" == "--configure-ai-settings-only" ]]; then
   configure_antigravity_admin_settings
   configure_anthropic_managed_settings
+  configure_claude_desktop_managed_settings
   exit 0
 fi
 
@@ -2030,6 +2093,9 @@ if [[ -n "${ON_CONNECT_USER_ANTIGRAVITY_KEY:-}" && ( "$(id -u)" -eq 0 || -n "${O
 fi
 if [[ -n "${ON_CONNECT_USER_ANTHROPIC_API_KEY:-}" && ( "$(id -u)" -eq 0 || -n "${ON_CONNECT_CLAUDE_ETC_DIR:-}" ) ]]; then
   ANTHROPIC_API_KEY="${ON_CONNECT_USER_ANTHROPIC_API_KEY}" configure_anthropic_managed_settings
+fi
+if [[ -n "${ON_CONNECT_USER_ANTHROPIC_API_KEY:-}" && ( "$(id -u)" -eq 0 || -n "${ON_CONNECT_CLAUDE_DESKTOP_ETC_DIR:-}" ) ]]; then
+  ANTHROPIC_API_KEY="${ON_CONNECT_USER_ANTHROPIC_API_KEY}" configure_claude_desktop_managed_settings
 fi
 
 if [[ -n "${ON_CONNECT_USER_ANTIGRAVITY_KEY:-}" && -n "${ANTIGRAVITY_URL:-}" && -f "$ANTIGRAVITY_ADMIN_SETTINGS_SRC" ]]; then

@@ -1,0 +1,14 @@
+{
+  "inferenceProvider": "gateway",
+  "inferenceCredentialKind": "static",
+  "inferenceGatewayBaseUrl": "__ANTHROPIC_BASE_URL__",
+  "inferenceGatewayApiKey": "__ANTHROPIC_API_KEY__",
+  "inferenceGatewayAuthScheme": "bearer",
+  "inferenceModels": [
+    {
+      "name": "claude-sonnet-5-5",
+      "labelOverride": "Claude Sonnet 5.5"
+    }
+  ],
+  "chatTabEnabled": true
+}

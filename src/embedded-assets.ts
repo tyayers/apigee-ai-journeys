@@ -7,12 +7,14 @@ import rdpWasmJs from "../public/wasm/rdp_wasm.js" with { type: "file" };
 import rdpWasmBg from "../public/wasm/rdp_wasm_bg.wasm" with { type: "file" };
 import onConnectSh from "../scripts/on-connect.sh" with { type: "file" };
 import antigravitySettingsJson from "../config/antigravity_settings.json" with { type: "file" };
-import anthropicSettingsJson from "../config/anthropic_settings.json" with { type: "file" };
+import anthropicSettingsJson from "../config/claude_code_settings.json" with { type: "file" };
+import claudeDesktopSettingsJson from "../config/claude_desktop_settings.json" with { type: "file" };
 
 export const EMBEDDED_ON_CONNECT_SCRIPT: string = onConnectSh;
 export const EMBEDDED_WALLPAPER_JPG: string = wallpaperJpg;
 export const EMBEDDED_ANTIGRAVITY_SETTINGS_JSON: string = antigravitySettingsJson;
 export const EMBEDDED_ANTHROPIC_SETTINGS_JSON: string = anthropicSettingsJson;
+export const EMBEDDED_CLAUDE_DESKTOP_SETTINGS_JSON: string = claudeDesktopSettingsJson;
 
 export const EMBEDDED_PUBLIC_FILES: Record<string, { filePath: string; contentType: string }> = {
   "/index.html": { filePath: indexHtml, contentType: "text/html; charset=utf-8" },

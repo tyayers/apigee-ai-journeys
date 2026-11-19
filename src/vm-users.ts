@@ -6,6 +6,7 @@ import { POSIX_USERNAME_RE, RESERVED_USERNAMES } from "./auth.ts";
 import {
   EMBEDDED_ANTHROPIC_SETTINGS_JSON,
   EMBEDDED_ANTIGRAVITY_SETTINGS_JSON,
+  EMBEDDED_CLAUDE_DESKTOP_SETTINGS_JSON,
   EMBEDDED_ON_CONNECT_SCRIPT,
   EMBEDDED_WALLPAPER_JPG,
 } from "./embedded-assets.ts";
@@ -412,6 +413,7 @@ export class VmUserManager {
     wallpaperPath: string;
     antigravitySettingsPath: string;
     anthropicSettingsPath: string;
+    claudeDesktopSettingsPath: string;
   }> {
     let scriptPath = this.config.onConnectScript!;
     const preferEmbedded =
@@ -443,13 +445,28 @@ export class VmUserManager {
       antigravitySettingsPath = fallbackAgSettings;
     }
 
-    let anthropicSettingsPath = path.join(this.config.configDir, "anthropic_settings.json");
+    let anthropicSettingsPath = path.join(this.config.configDir, "claude_code_settings.json");
     if (preferEmbedded || !(await Bun.file(anthropicSettingsPath).exists())) {
       await fs.mkdir(this.config.dataDir, { recursive: true, mode: 0o755 });
-      const fallbackAnthropicSettings = path.join(this.config.dataDir, "anthropic_settings.json");
+      const fallbackAnthropicSettings = path.join(this.config.dataDir, "claude_code_settings.json");
       const text = await Bun.file(EMBEDDED_ANTHROPIC_SETTINGS_JSON).text();
       await fs.writeFile(fallbackAnthropicSettings, text, { mode: 0o644 });
       anthropicSettingsPath = fallbackAnthropicSettings;
+    }
+
+    let claudeDesktopSettingsPath = path.join(
+      this.config.configDir,
+      "claude_desktop_settings.json"
+    );
+    if (preferEmbedded || !(await Bun.file(claudeDesktopSettingsPath).exists())) {
+      await fs.mkdir(this.config.dataDir, { recursive: true, mode: 0o755 });
+      const fallbackClaudeDesktopSettings = path.join(
+        this.config.dataDir,
+        "claude_desktop_settings.json"
+      );
+      const text = await Bun.file(EMBEDDED_CLAUDE_DESKTOP_SETTINGS_JSON).text();
+      await fs.writeFile(fallbackClaudeDesktopSettings, text, { mode: 0o644 });
+      claudeDesktopSettingsPath = fallbackClaudeDesktopSettings;
     }
 
     return {
@@ -457,6 +474,7 @@ export class VmUserManager {
       wallpaperPath,
       antigravitySettingsPath,
       anthropicSettingsPath,
+      claudeDesktopSettingsPath,
     };
   }
 
@@ -468,8 +486,13 @@ export class VmUserManager {
       return;
     }
 
-    const { scriptPath, wallpaperPath, antigravitySettingsPath, anthropicSettingsPath } =
-      await this.resolveOnConnectAssets();
+    const {
+      scriptPath,
+      wallpaperPath,
+      antigravitySettingsPath,
+      anthropicSettingsPath,
+      claudeDesktopSettingsPath,
+    } = await this.resolveOnConnectAssets();
     const argv = [
       ...(this.config.useSudo ? ["sudo", "-n"] : []),
       "/bin/bash",
@@ -486,6 +509,7 @@ export class VmUserManager {
         ON_CONNECT_WALLPAPER_SRC: wallpaperPath,
         ON_CONNECT_ANTIGRAVITY_ADMIN_SETTINGS_SRC: antigravitySettingsPath,
         ON_CONNECT_ANTHROPIC_SETTINGS_SRC: anthropicSettingsPath,
+        ON_CONNECT_CLAUDE_DESKTOP_SETTINGS_SRC: claudeDesktopSettingsPath,
         ON_CONNECT_KEEP_SESSIONS_RUNNING: this.config.keepSessionsRunning ? "true" : "false",
       },
     });
@@ -572,8 +596,13 @@ export class VmUserManager {
       }
     }
 
-    const { scriptPath, wallpaperPath, antigravitySettingsPath, anthropicSettingsPath } =
-      await this.resolveOnConnectAssets();
+    const {
+      scriptPath,
+      wallpaperPath,
+      antigravitySettingsPath,
+      anthropicSettingsPath,
+      claudeDesktopSettingsPath,
+    } = await this.resolveOnConnectAssets();
 
     const useSudo = this.config.useSudo && !options?.homeDirOverride;
     const argv = [...(useSudo ? ["sudo", "-n"] : []), "/bin/bash", scriptPath, username, homeDir];
@@ -587,6 +616,7 @@ export class VmUserManager {
         ON_CONNECT_WALLPAPER_SRC: wallpaperPath,
         ON_CONNECT_ANTIGRAVITY_ADMIN_SETTINGS_SRC: antigravitySettingsPath,
         ON_CONNECT_ANTHROPIC_SETTINGS_SRC: anthropicSettingsPath,
+        ON_CONNECT_CLAUDE_DESKTOP_SETTINGS_SRC: claudeDesktopSettingsPath,
         ON_CONNECT_KEEP_SESSIONS_RUNNING: this.config.keepSessionsRunning ? "true" : "false",
         ...portalEnv,
         ...(options?.envOverrides ?? {}),

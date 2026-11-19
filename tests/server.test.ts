@@ -1098,14 +1098,16 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     simulatedCpu5m = 18.5;
   });
 
-  test("renders config/antigravity_settings.json and config/anthropic_settings.json to admin MDM directories", async () => {
+  test("renders config/antigravity_settings.json, config/claude_code_settings.json, and config/claude_desktop_settings.json to admin MDM directories", async () => {
     const mdmTestDir = path.join(tmpDir, "mdm-ai-settings");
     const agEtcDir = path.join(mdmTestDir, "etc-antigravity");
     const claudeEtcDir = path.join(mdmTestDir, "etc-claude-code");
+    const claudeDesktopEtcDir = path.join(mdmTestDir, "etc-claude-desktop");
     const agTargetFile = path.join(agEtcDir, "admin_settings.json");
     const claudeTargetFile = path.join(claudeEtcDir, "managed-settings.json");
+    const claudeDesktopTargetFile = path.join(claudeDesktopEtcDir, "managed-settings.json");
 
-    // 1. Omitted env vars -> Antigravity file is skipped, Claude managed-settings keeps DISABLE_AUTOUPDATER only
+    // 1. Omitted env vars -> Antigravity & Claude Desktop files are skipped, Claude Code managed-settings keeps DISABLE_AUTOUPDATER only
     const skipProc = Bun.spawn(
       ["/bin/bash", path.resolve("scripts/on-connect.sh"), "--configure-ai-settings-only"],
       {
@@ -1113,6 +1115,7 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
           ...process.env,
           ON_CONNECT_ANTIGRAVITY_ETC_DIR: agEtcDir,
           ON_CONNECT_CLAUDE_ETC_DIR: claudeEtcDir,
+          ON_CONNECT_CLAUDE_DESKTOP_ETC_DIR: claudeDesktopEtcDir,
           ANTIGRAVITY_URL: "",
           ANTIGRAVITY_KEY: "",
           ANTHROPIC_BASE_URL: "",
@@ -1128,6 +1131,7 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     );
     expect(await skipProc.exited).toBe(0);
     expect(await Bun.file(agTargetFile).exists()).toBe(false);
+    expect(await Bun.file(claudeDesktopTargetFile).exists()).toBe(false);
     const claudeDefault = JSON.parse(await fs.readFile(claudeTargetFile, "utf8"));
     expect(claudeDefault).toEqual({
       env: {
@@ -1143,6 +1147,7 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
           ...process.env,
           ON_CONNECT_ANTIGRAVITY_ETC_DIR: agEtcDir,
           ON_CONNECT_CLAUDE_ETC_DIR: claudeEtcDir,
+          ON_CONNECT_CLAUDE_DESKTOP_ETC_DIR: claudeDesktopEtcDir,
           ANTIGRAVITY_URL: "https://gateway.example.com/v1?a=1&b=2",
           ANTIGRAVITY_KEY: 'ag-key-"special"\\test',
           ANTHROPIC_BASE_URL: "https://anthropic-gw.example.com",
@@ -1189,6 +1194,22 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
         ANTHROPIC_DEFAULT_SONNET_MODEL: "claude-sonnet-4",
         ANTHROPIC_DEFAULT_HAIKU_MODEL: "claude-haiku-4",
       },
+    });
+
+    const claudeDesktopRendered = JSON.parse(await fs.readFile(claudeDesktopTargetFile, "utf8"));
+    expect(claudeDesktopRendered).toEqual({
+      inferenceProvider: "gateway",
+      inferenceCredentialKind: "static",
+      inferenceGatewayBaseUrl: "https://anthropic-gw.example.com",
+      inferenceGatewayApiKey: "key-456",
+      inferenceGatewayAuthScheme: "bearer",
+      inferenceModels: [
+        {
+          name: "claude-sonnet-4-6",
+          labelOverride: "Claude Sonnet 4.6",
+        },
+      ],
+      chatTabEnabled: true,
     });
   });
 
@@ -1333,10 +1354,12 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
       const mockAppsDir = path.join(portalUserTestDir, "apps");
       const mockAgEtcDir = path.join(portalUserTestDir, "etc-antigravity");
       const mockClaudeEtcDir = path.join(portalUserTestDir, "etc-claude-code");
+      const mockClaudeDesktopEtcDir = path.join(portalUserTestDir, "etc-claude-desktop");
       const userHome = path.join(portalUserTestDir, "home");
       await fs.mkdir(mockAppsDir, { recursive: true });
       await fs.mkdir(mockAgEtcDir, { recursive: true });
       await fs.mkdir(mockClaudeEtcDir, { recursive: true });
+      await fs.mkdir(mockClaudeDesktopEtcDir, { recursive: true });
       await fs.mkdir(userHome, { recursive: true });
 
       await fs.writeFile(
@@ -1356,6 +1379,7 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
             ON_CONNECT_APPS_DIR: mockAppsDir,
             ON_CONNECT_ANTIGRAVITY_ETC_DIR: mockAgEtcDir,
             ON_CONNECT_CLAUDE_ETC_DIR: mockClaudeEtcDir,
+            ON_CONNECT_CLAUDE_DESKTOP_ETC_DIR: mockClaudeDesktopEtcDir,
             ANTIGRAVITY_URL: "https://ag.gateway.example.com",
             ANTHROPIC_BASE_URL: "https://claude.gateway.example.com",
             ON_CONNECT_USER_ANTIGRAVITY_KEY: existingRes!.apiKey,
@@ -1398,6 +1422,24 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           ANTHROPIC_BASE_URL: "https://claude.gateway.example.com",
           ANTHROPIC_API_KEY: "portal-generated-client-id-999",
         },
+      });
+
+      const claudeDesktopMdmSettings = JSON.parse(
+        await fs.readFile(path.join(mockClaudeDesktopEtcDir, "managed-settings.json"), "utf8")
+      );
+      expect(claudeDesktopMdmSettings).toEqual({
+        inferenceProvider: "gateway",
+        inferenceCredentialKind: "static",
+        inferenceGatewayBaseUrl: "https://claude.gateway.example.com",
+        inferenceGatewayApiKey: "portal-generated-client-id-999",
+        inferenceGatewayAuthScheme: "bearer",
+        inferenceModels: [
+          {
+            name: "claude-sonnet-4-6",
+            labelOverride: "Claude Sonnet 4.6",
+          },
+        ],
+        chatTabEnabled: true,
       });
 
       const agUserSettings = JSON.parse(
