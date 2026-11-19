@@ -11,11 +11,12 @@ const state = {
   rdpPassword: "",
   viewer: null,
   connecting: false,
+  switchingView: false,
   isStandaloneTab:
     window.location.pathname === "/desktop" || urlParams.get("view") === "desktop",
 };
 
-// Cross-tab coordination so opening "/desktop" disconnects the embedded viewer cleanly
+// Cross-tab coordination so switching between "/" and "/desktop" disconnects cleanly without signing out
 const handoffChannel =
   typeof BroadcastChannel === "function" ? new BroadcastChannel("apigee_ai_demos_rdp") : null;
 
@@ -30,7 +31,6 @@ const el = {
   navToggleBtn: document.getElementById("nav-toggle-btn"),
   navRail: document.getElementById("nav-rail"),
   topbarBrandLink: document.getElementById("topbar-brand-link"),
-  standaloneBadge: document.getElementById("standalone-badge"),
   openNewTabLink: document.getElementById("open-new-tab-link"),
   themeToggleBtn: document.getElementById("theme-toggle-btn"),
   topbarUserEmail: document.getElementById("topbar-user-email"),
@@ -47,10 +47,38 @@ const el = {
   rdpStatusDot: document.getElementById("rdp-status-dot"),
   rdpStatusText: document.getElementById("rdp-status-text"),
   clipboardBtn: document.getElementById("clipboard-btn"),
-  cadBtn: document.getElementById("cad-btn"),
   fullscreenBtn: document.getElementById("fullscreen-btn"),
   disconnectBtn: document.getElementById("disconnect-btn"),
   stopSessionBtn: document.getElementById("stop-session-btn"),
+
+  topbarMoreBtn: document.getElementById("topbar-more-btn"),
+  topbarMoreMenu: document.getElementById("topbar-more-menu"),
+  menuUserEmail: document.getElementById("menu-user-email"),
+  menuMetricCpuPill: document.getElementById("menu-metric-cpu-pill"),
+  menuMetricMemPill: document.getElementById("menu-metric-mem-pill"),
+  menuClipboardBtn: document.getElementById("menu-clipboard-btn"),
+  menuFullscreenBtn: document.getElementById("menu-fullscreen-btn"),
+  menuOpenNewTabLink: document.getElementById("menu-open-new-tab-link"),
+  menuDisconnectBtn: document.getElementById("menu-disconnect-btn"),
+  menuStopSessionBtn: document.getElementById("menu-stop-session-btn"),
+  menuThemeToggleBtn: document.getElementById("menu-theme-toggle-btn"),
+  menuLogoutBtn: document.getElementById("menu-logout-btn"),
+
+  standaloneDrawerToggle: document.getElementById("standalone-drawer-toggle"),
+  standaloneDrawer: document.getElementById("standalone-drawer"),
+  standaloneDrawerClose: document.getElementById("standalone-drawer-close"),
+  drawerStatusDot: document.getElementById("drawer-status-dot"),
+  drawerStatusText: document.getElementById("drawer-status-text"),
+  drawerUserEmail: document.getElementById("drawer-user-email"),
+  drawerMetricCpuPill: document.getElementById("drawer-metric-cpu-pill"),
+  drawerMetricMemPill: document.getElementById("drawer-metric-mem-pill"),
+  switchFullViewLink: document.getElementById("switch-full-view-link"),
+  drawerClipboardBtn: document.getElementById("drawer-clipboard-btn"),
+  drawerFullscreenBtn: document.getElementById("drawer-fullscreen-btn"),
+  drawerDisconnectBtn: document.getElementById("drawer-disconnect-btn"),
+  drawerStopSessionBtn: document.getElementById("drawer-stop-session-btn"),
+  drawerThemeToggleBtn: document.getElementById("drawer-theme-toggle-btn"),
+  drawerLogoutBtn: document.getElementById("drawer-logout-btn"),
 
   rdpViewport: document.getElementById("rdp-viewport"),
   rdpCanvas: document.getElementById("rdp-canvas"),
@@ -111,7 +139,7 @@ function setupThemeToggle() {
     }
   };
 
-  el.themeToggleBtn.addEventListener("click", () => {
+  const toggleTheme = () => {
     const pinned = localStorage.getItem("color-scheme");
     const systemScheme = sysDarkQuery.matches ? "dark" : "light";
     const oppositeOfSystem = systemScheme === "dark" ? "light" : "dark";
@@ -121,7 +149,11 @@ function setupThemeToggle() {
     } else {
       applyScheme(null);
     }
-  });
+  };
+
+  for (const btn of [el.themeToggleBtn, el.menuThemeToggleBtn, el.drawerThemeToggleBtn]) {
+    btn?.addEventListener("click", toggleTheme);
+  }
 }
 
 function withUserQuery(basePath) {
@@ -156,22 +188,60 @@ function renderHostMetrics(metrics) {
   const cpuNow = Math.round(metrics.cpuCurrentPercent);
   const cpu5m = Number(metrics.cpuAvg5mPercent).toFixed(1);
   const memPct = Math.round(metrics.memUsedPercent);
+  const cpuLabel = metrics.overloaded
+    ? `! CPU ${cpuNow}% · 5m ${cpu5m}%`
+    : `CPU ${cpuNow}% · 5m ${cpu5m}%`;
+  const memLabel = `MEM ${memPct}%`;
 
-  if (el.metricCpuPill) {
-    el.metricCpuPill.dataset.overloaded = metrics.overloaded ? "true" : "false";
-    el.metricCpuPill.textContent = metrics.overloaded
-      ? `! CPU ${cpuNow}% · 5m ${cpu5m}%`
-      : `CPU ${cpuNow}% · 5m ${cpu5m}%`;
+  for (const pill of [el.metricCpuPill, el.menuMetricCpuPill, el.drawerMetricCpuPill]) {
+    if (!pill) continue;
+    pill.dataset.overloaded = metrics.overloaded ? "true" : "false";
+    pill.textContent = cpuLabel;
   }
-  if (el.metricMemPill) {
-    el.metricMemPill.textContent = `MEM ${memPct}%`;
+  for (const pill of [el.metricMemPill, el.menuMetricMemPill, el.drawerMetricMemPill]) {
+    if (pill) pill.textContent = memLabel;
   }
   if (el.sidebarCpuAvg) {
     el.sidebarCpuAvg.textContent = `${cpu5m}% (now ${cpuNow}%)`;
   }
   if (el.sidebarMemUsed) {
-    el.sidebarMemUsed.textContent = `${memPct}%`;
+    el.sidebarMemUsed.textContent = memLabel.replace("MEM ", "");
   }
+}
+
+function setRdpStatus(dotState, label) {
+  for (const dot of [el.rdpStatusDot, el.drawerStatusDot]) {
+    if (dot) dot.dataset.state = dotState;
+  }
+  for (const textEl of [el.rdpStatusText, el.drawerStatusText]) {
+    if (textEl) textEl.textContent = label;
+  }
+}
+
+function setSessionControls({ connected, showStop }) {
+  for (const btn of [el.disconnectBtn, el.menuDisconnectBtn, el.drawerDisconnectBtn]) {
+    if (btn) btn.hidden = !connected;
+  }
+  if (typeof showStop === "boolean") {
+    for (const btn of [el.stopSessionBtn, el.menuStopSessionBtn, el.drawerStopSessionBtn]) {
+      if (btn) btn.hidden = !showStop;
+    }
+  }
+  for (const btn of [el.clipboardBtn, el.menuClipboardBtn, el.drawerClipboardBtn]) {
+    if (btn) btn.disabled = !connected;
+  }
+}
+
+function setMoreMenuOpen(open) {
+  if (!el.topbarMoreMenu || !el.topbarMoreBtn) return;
+  el.topbarMoreMenu.hidden = !open;
+  el.topbarMoreBtn.setAttribute("aria-expanded", String(open));
+}
+
+function setStandaloneDrawerOpen(open) {
+  if (!el.standaloneDrawer || !el.standaloneDrawerToggle) return;
+  el.standaloneDrawer.hidden = !open;
+  el.standaloneDrawerToggle.setAttribute("aria-expanded", String(open));
 }
 
 function renderSidebarLinks(links) {
@@ -261,23 +331,20 @@ function ensureRdpViewer() {
     canvas: el.rdpCanvas,
     viewport: el.rdpViewport,
     onStatus: (status, detail) => {
-      el.rdpStatusDot.dataset.state = status === "error" ? "disconnected" : status;
+      const dotState = status === "error" ? "disconnected" : status;
 
       if (status === "connected") {
         state.connecting = false;
-        el.rdpStatusText.textContent = detail ? `Connected · ${detail}` : "Connected";
+        setRdpStatus(dotState, detail ? `Connected · ${detail}` : "Connected");
         el.rdpConnectOverlay.hidden = true;
-        el.disconnectBtn.hidden = false;
-        el.stopSessionBtn.hidden = !state.keepSessionsRunning;
-        el.clipboardBtn.disabled = false;
-        el.cadBtn.disabled = false;
+        setSessionControls({ connected: true, showStop: state.keepSessionsRunning });
         el.rdpReconnectBtn.textContent = "Reconnect to desktop";
         el.rdpReconnectBtn.hidden = true;
         setBanner(el.rdpErrorBanner, "");
       } else if (status === "connecting") {
         state.connecting = true;
         const msg = detail || "Connecting…";
-        el.rdpStatusText.textContent = msg;
+        setRdpStatus(dotState, msg);
         el.overlayHeading.textContent = "Connecting to desktop";
         el.overlayDesc.textContent = msg;
         el.rdpConnectOverlay.hidden = false;
@@ -286,7 +353,7 @@ function ensureRdpViewer() {
         state.connecting = false;
         const isResourceBusy =
           typeof detail === "string" && detail.toLowerCase().includes("no free resources");
-        el.rdpStatusText.textContent = isResourceBusy ? "No free resources" : "Disconnected";
+        setRdpStatus(dotState, isResourceBusy ? "No free resources" : "Disconnected");
         el.overlayHeading.textContent = isResourceBusy
           ? "No free resources available"
           : "Connection interrupted";
@@ -298,22 +365,18 @@ function ensureRdpViewer() {
           ? "Retry connection"
           : "Reconnect to desktop";
         el.rdpReconnectBtn.hidden = false;
-        el.disconnectBtn.hidden = true;
-        el.clipboardBtn.disabled = true;
-        el.cadBtn.disabled = true;
+        setSessionControls({ connected: false });
         setBanner(el.rdpErrorBanner, detail || "Unable to establish xrdp session.");
       } else {
         state.connecting = false;
-        el.rdpStatusText.textContent = detail || "Signed out";
+        setRdpStatus(dotState, detail || "Signed out");
         el.overlayHeading.textContent =
           detail === "Moved to new tab" ? "Active in new tab" : "Desktop signed out";
         el.overlayDesc.textContent = `Reconnect to start a fresh desktop session for '${state.user?.username || ""}'.`;
         el.rdpConnectOverlay.hidden = false;
         el.rdpReconnectBtn.textContent = "Reconnect to desktop";
         el.rdpReconnectBtn.hidden = false;
-        el.disconnectBtn.hidden = true;
-        el.clipboardBtn.disabled = true;
-        el.cadBtn.disabled = true;
+        setSessionControls({ connected: false });
       }
     },
     onRemoteClipboard: (text) => {
@@ -330,9 +393,9 @@ async function provisionAndAutoConnect() {
   el.rdpConnectOverlay.hidden = false;
   el.rdpReconnectBtn.hidden = true;
   el.rdpStatusDot.dataset.state = "connecting";
+  setRdpStatus("connecting", `Provisioning '${state.user.username}'…`);
   el.overlayHeading.textContent = "Preparing workstation";
   el.overlayDesc.textContent = `Ensuring Linux user '${state.user.username}' is ready…`;
-  el.rdpStatusText.textContent = `Provisioning '${state.user.username}'…`;
 
   try {
     const ensured = await apiPost("/api/vm-user/ensure", {});
@@ -355,8 +418,7 @@ async function provisionAndAutoConnect() {
       renderHostMetrics(err.metrics);
     }
     const isResourceBusy = err.code === "RESOURCE_BUSY";
-    el.rdpStatusDot.dataset.state = "disconnected";
-    el.rdpStatusText.textContent = isResourceBusy ? "No free resources" : "Disconnected";
+    setRdpStatus("disconnected", isResourceBusy ? "No free resources" : "Disconnected");
     el.overlayHeading.textContent = isResourceBusy
       ? "No free resources available"
       : "Provisioning failed";
@@ -373,27 +435,40 @@ async function provisionAndAutoConnect() {
 
 function renderAuthenticatedWorkspace() {
   el.topbarUserEmail.textContent = state.user.email;
+  if (el.menuUserEmail) el.menuUserEmail.textContent = state.user.email;
+  if (el.drawerUserEmail) el.drawerUserEmail.textContent = state.user.email;
   el.sidebarVmUser.textContent = state.user.username;
   el.sidebarVmHome.textContent = `/home/${state.user.username}`;
   el.overlayUsername.textContent = state.user.username;
   el.topbarBrandLink.href = withUserQuery("/");
   el.openNewTabLink.href = withUserQuery("/desktop");
-  el.logoutBtn.hidden = state.authSource === "iap";
+  if (el.menuOpenNewTabLink) el.menuOpenNewTabLink.href = withUserQuery("/desktop");
+  if (el.switchFullViewLink) el.switchFullViewLink.href = withUserQuery("/");
+
+  const hideLogout = state.authSource === "iap";
+  for (const btn of [el.logoutBtn, el.menuLogoutBtn, el.drawerLogoutBtn]) {
+    if (btn) btn.hidden = hideLogout;
+  }
 
   if (state.isStandaloneTab) {
     el.workspaceView.classList.add("is-standalone-desktop");
     el.navRail.hidden = true;
     el.navToggleBtn.hidden = true;
     el.openNewTabLink.hidden = true;
-    el.standaloneBadge.hidden = false;
+    if (el.standaloneDrawerToggle) el.standaloneDrawerToggle.hidden = false;
+    setStandaloneDrawerOpen(false);
     document.title = `Desktop (${state.user.username}) · Apigee AI Journeys`;
     if (handoffChannel) {
       handoffChannel.postMessage({ type: "claimed_standalone_tab", username: state.user.username });
     }
   } else {
     el.workspaceView.classList.remove("is-standalone-desktop");
-    el.standaloneBadge.hidden = true;
     el.openNewTabLink.hidden = false;
+    if (el.standaloneDrawerToggle) el.standaloneDrawerToggle.hidden = true;
+    setStandaloneDrawerOpen(false);
+    if (handoffChannel) {
+      handoffChannel.postMessage({ type: "claimed_full_view", username: state.user.username });
+    }
   }
 
   showExclusiveView("workspace");
@@ -414,14 +489,21 @@ async function bootstrap() {
       const msg = event.data;
       if (!msg || !state.user || msg.username !== state.user.username) return;
       if (msg.type === "claimed_standalone_tab" && !state.isStandaloneTab && state.viewer?.connected) {
-        state.viewer.disconnect();
-        el.rdpStatusDot.dataset.state = "disconnected";
-        el.rdpStatusText.textContent = "Moved to new tab";
+        state.viewer.disconnect(4002, "Switching view");
+        setRdpStatus("disconnected", "Moved to new tab");
         el.overlayHeading.textContent = "Session open in new tab";
         el.overlayDesc.textContent = `Linux desktop for '${state.user.username}' was transferred to the standalone tab.`;
         el.rdpConnectOverlay.hidden = false;
         el.rdpReconnectBtn.hidden = false;
-        el.disconnectBtn.hidden = true;
+        setSessionControls({ connected: false });
+      } else if (msg.type === "claimed_full_view" && state.isStandaloneTab && state.viewer?.connected) {
+        state.viewer.disconnect(4002, "Switching view");
+        setRdpStatus("disconnected", "Moved to full view");
+        el.overlayHeading.textContent = "Session open in full view";
+        el.overlayDesc.textContent = `Linux desktop for '${state.user.username}' was transferred to the full workspace tab.`;
+        el.rdpConnectOverlay.hidden = false;
+        el.rdpReconnectBtn.hidden = false;
+        setSessionControls({ connected: false });
       }
     });
   }
@@ -432,78 +514,139 @@ async function bootstrap() {
     el.navToggleBtn.setAttribute("aria-expanded", String(!nextHidden));
   });
 
+  el.topbarMoreBtn?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setMoreMenuOpen(el.topbarMoreMenu.hidden);
+  });
+
+  el.standaloneDrawerToggle?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setStandaloneDrawerOpen(el.standaloneDrawer.hidden);
+  });
+
+  el.standaloneDrawerClose?.addEventListener("click", () => {
+    setStandaloneDrawerOpen(false);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (el.topbarMoreMenu && !el.topbarMoreMenu.hidden) {
+      if (!el.topbarMoreMenu.contains(event.target) && !el.topbarMoreBtn?.contains(event.target)) {
+        setMoreMenuOpen(false);
+      }
+    }
+    if (el.standaloneDrawer && !el.standaloneDrawer.hidden) {
+      if (
+        !el.standaloneDrawer.contains(event.target) &&
+        !el.standaloneDrawerToggle?.contains(event.target)
+      ) {
+        setStandaloneDrawerOpen(false);
+      }
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (el.topbarMoreMenu && !el.topbarMoreMenu.hidden) setMoreMenuOpen(false);
+    if (el.standaloneDrawer && !el.standaloneDrawer.hidden) setStandaloneDrawerOpen(false);
+  });
+
+  el.switchFullViewLink?.addEventListener("click", (event) => {
+    event.preventDefault();
+    state.switchingView = true;
+    state.viewer?.disconnect(4002, "Switching view");
+    window.location.href = withUserQuery("/");
+  });
+
   el.rdpReconnectBtn.addEventListener("click", () => {
     void provisionAndAutoConnect();
   });
 
-  el.disconnectBtn.addEventListener("click", () => {
+  const handleDisconnect = () => {
+    setMoreMenuOpen(false);
+    setStandaloneDrawerOpen(false);
     state.viewer?.disconnect();
-    el.rdpStatusDot.dataset.state = "disconnected";
     if (state.keepSessionsRunning) {
-      el.rdpStatusText.textContent = "Disconnected";
+      setRdpStatus("disconnected", "Disconnected");
       el.overlayHeading.textContent = "Session paused";
       el.overlayDesc.textContent = `Your desktop session for '${state.user?.username || ""}' is still running on the host. Reconnect to resume.`;
       el.rdpReconnectBtn.textContent = "Resume desktop";
-      el.stopSessionBtn.hidden = false;
+      setSessionControls({ connected: false, showStop: true });
     } else {
-      el.rdpStatusText.textContent = "Signed out";
+      setRdpStatus("disconnected", "Signed out");
       el.overlayHeading.textContent = "Desktop signed out";
       el.overlayDesc.textContent = `Reconnect to start a fresh desktop session for '${state.user?.username || ""}'.`;
       el.rdpReconnectBtn.textContent = "Reconnect to desktop";
-      el.stopSessionBtn.hidden = true;
+      setSessionControls({ connected: false, showStop: false });
     }
     el.rdpConnectOverlay.hidden = false;
     el.rdpReconnectBtn.hidden = false;
-    el.disconnectBtn.hidden = true;
-    el.clipboardBtn.disabled = true;
-    el.cadBtn.disabled = true;
-  });
+  };
 
-  el.stopSessionBtn.addEventListener("click", async () => {
-    el.stopSessionBtn.disabled = true;
+  for (const btn of [el.disconnectBtn, el.menuDisconnectBtn, el.drawerDisconnectBtn]) {
+    btn?.addEventListener("click", handleDisconnect);
+  }
+
+  const handleStopSession = async () => {
+    setMoreMenuOpen(false);
+    setStandaloneDrawerOpen(false);
+    for (const btn of [el.stopSessionBtn, el.menuStopSessionBtn, el.drawerStopSessionBtn]) {
+      if (btn) btn.disabled = true;
+    }
     state.viewer?.disconnect();
     try {
       await apiPost("/api/rdp/stop", {});
     } catch {
       // Best-effort
     } finally {
-      el.stopSessionBtn.disabled = false;
+      for (const btn of [el.stopSessionBtn, el.menuStopSessionBtn, el.drawerStopSessionBtn]) {
+        if (btn) btn.disabled = false;
+      }
     }
-    el.rdpStatusDot.dataset.state = "disconnected";
-    el.rdpStatusText.textContent = "Signed out";
+    setRdpStatus("disconnected", "Signed out");
     el.overlayHeading.textContent = "Desktop session stopped";
     el.overlayDesc.textContent = `Reconnect to start a fresh desktop session for '${state.user?.username || ""}'.`;
     el.rdpConnectOverlay.hidden = false;
     el.rdpReconnectBtn.textContent = "Reconnect to desktop";
     el.rdpReconnectBtn.hidden = false;
-    el.disconnectBtn.hidden = true;
-    el.stopSessionBtn.hidden = true;
-    el.clipboardBtn.disabled = true;
-    el.cadBtn.disabled = true;
-  });
+    setSessionControls({ connected: false, showStop: false });
+  };
+
+  for (const btn of [el.stopSessionBtn, el.menuStopSessionBtn, el.drawerStopSessionBtn]) {
+    btn?.addEventListener("click", () => {
+      void handleStopSession();
+    });
+  }
 
   // Immediately close WebSocket on tab close / reload so the VM desktop session signs out right away
   window.addEventListener("pagehide", () => {
-    state.viewer?.disconnect();
+    if (!state.switchingView) {
+      state.viewer?.disconnect();
+    }
   });
 
-  el.cadBtn.addEventListener("click", () => {
-    state.viewer?.sendCtrlAltDel();
-    el.rdpCanvas.focus();
-  });
-
-  el.fullscreenBtn.addEventListener("click", () => {
+  const handleFullscreen = () => {
+    setMoreMenuOpen(false);
     if (!document.fullscreenElement) {
       el.rdpViewport.requestFullscreen?.().catch(() => {});
     } else {
       document.exitFullscreen?.().catch(() => {});
     }
-  });
+  };
+
+  for (const btn of [el.fullscreenBtn, el.menuFullscreenBtn, el.drawerFullscreenBtn]) {
+    btn?.addEventListener("click", handleFullscreen);
+  }
 
   // Clipboard modal
-  el.clipboardBtn.addEventListener("click", () => {
+  const handleOpenClipboard = () => {
+    setMoreMenuOpen(false);
     el.clipboardDialog.showModal();
-  });
+  };
+
+  for (const btn of [el.clipboardBtn, el.menuClipboardBtn, el.drawerClipboardBtn]) {
+    btn?.addEventListener("click", handleOpenClipboard);
+  }
+
   el.closeClipboardDialogBtn.addEventListener("click", () => el.clipboardDialog.close());
   el.closeClipboardBtn.addEventListener("click", () => el.clipboardDialog.close());
   el.clipboardForm.addEventListener("submit", (e) => {
@@ -513,7 +656,9 @@ async function bootstrap() {
     el.rdpCanvas.focus();
   });
 
-  el.logoutBtn.addEventListener("click", async () => {
+  const handleLogout = async () => {
+    setMoreMenuOpen(false);
+    setStandaloneDrawerOpen(false);
     state.viewer?.disconnect();
     try {
       await apiPost("/api/auth/logout", {});
@@ -521,7 +666,13 @@ async function bootstrap() {
       // Ignore
     }
     window.location.href = state.isStandaloneTab ? "/desktop" : "/";
-  });
+  };
+
+  for (const btn of [el.logoutBtn, el.menuLogoutBtn, el.drawerLogoutBtn]) {
+    btn?.addEventListener("click", () => {
+      void handleLogout();
+    });
+  }
 
   const resp = await fetch(withUserQuery("/api/me"), { credentials: "same-origin" });
   const data = await resp.json().catch(() => ({}));

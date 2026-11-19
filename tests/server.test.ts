@@ -9,6 +9,7 @@ import { deriveLinuxUsername, parseUserIdentity } from "../src/auth.ts";
 import { loadConfig } from "../src/config.ts";
 import { HostMetricsMonitor, RESOURCE_BUSY_MESSAGE, type HostMetricsProvider } from "../src/host-metrics.ts";
 import { ensurePortalCodingAgentKey, mintPortalUserIdToken } from "../src/portal.ts";
+import { handleRdpWsClose } from "../src/rdp-proxy.ts";
 import { createAppServer } from "../src/server.ts";
 import { parseUsersYaml, VmUserManager, type SystemUserAdapter } from "../src/vm-users.ts";
 
@@ -1531,5 +1532,47 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
     } finally {
       mockPortal.stop(true);
     }
+  });
+
+  test("serves unified header, standalone /desktop overlay drawer, and preserves session across view switch (close code 4002)", async () => {
+    const res = await fetch(`${baseUrl}/`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toContain('id="cad-btn"');
+    expect(html).not.toContain('class="session-bar"');
+    expect(html).toContain('id="topbar-more-btn"');
+    expect(html).toContain('id="topbar-more-menu"');
+    expect(html).toContain('id="standalone-drawer-toggle"');
+    expect(html).toContain('id="standalone-drawer"');
+    expect(html).toContain('id="switch-full-view-link"');
+
+    // Verify handleRdpWsClose with code 4002 preserves session even when keepSessionsRunning=false
+    let terminated = false;
+    const mockVmUsers = {
+      async terminateDesktopSession() {
+        terminated = true;
+      },
+    } as unknown as VmUserManager;
+
+    const fakeWs = {
+      data: {
+        connId: 1,
+        openedAt: Date.now() - 1000,
+        user: {
+          username: "alice",
+          email: "alice@example.com",
+        },
+        keepSessionsRunning: false,
+        superseded: false,
+        closed: false,
+        txBytes: 0,
+        rxBytes: 0,
+      },
+    } as unknown as Parameters<typeof handleRdpWsClose>[0];
+
+    handleRdpWsClose(fakeWs, 4002, "Switching view", mockVmUsers);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(terminated).toBe(false);
+    expect(fakeWs.data.closed).toBe(true);
   });
 });

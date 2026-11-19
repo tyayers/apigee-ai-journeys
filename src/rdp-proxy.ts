@@ -211,6 +211,11 @@ export function handleRdpWsClose(
     ws.data,
     `Browser WebSocket closed (code=${code}, reason=${reason || "none"}, duration=${elapsed}ms, tx=${ws.data.txBytes}B, rx=${ws.data.rxBytes}B)`
   );
+  if (code === 4002) {
+    // Client is switching between / and /desktop; preserve the VM session.
+    ws.data.closed = true;
+    return;
+  }
   finalizeAndSignOut(ws, vmUsers, "browser disconnect");
 }
 

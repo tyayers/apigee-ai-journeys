@@ -597,7 +597,7 @@ export class RdpViewer {
     this.session.release_all();
   }
 
-  cleanupSessionOnly() {
+  cleanupSessionOnly(code = 1000, reason = "Client closed") {
     clearInterval(this.keepaliveTimer);
     this.keepaliveTimer = null;
     const sess = this.session;
@@ -615,7 +615,7 @@ export class RdpViewer {
       this.ws = null;
       try {
         if (sock.readyState === WebSocket.OPEN || sock.readyState === WebSocket.CONNECTING) {
-          sock.close(1000, "Client closed");
+          sock.close(code, reason);
         }
       } catch {
         // Ignore
@@ -624,9 +624,9 @@ export class RdpViewer {
     this.canvas.style.cursor = "default";
   }
 
-  disconnect() {
+  disconnect(code = 1000, reason = "Client closed") {
     clearTimeout(this.resizeTimer);
-    this.cleanupSessionOnly();
+    this.cleanupSessionOnly(code, reason);
   }
 
   destroy() {
