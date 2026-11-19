@@ -165,3 +165,36 @@ export async function ensurePortalCodingAgentKey(
   }
   return { apiKey: createdKey, createdApp: true };
 }
+
+/**
+ * Mints a user-scoped OIDC id_token via the Portal /token endpoint using portal:admin
+ * client credentials and subject_email/subject_name impersonation claims.
+ */
+export async function mintPortalUserIdToken(
+  config: Pick<AppConfig, "portalHost" | "portalAdminClientId" | "portalAdminClientSecret">,
+  userEmail: string
+): Promise<string | null> {
+  if (!isPortalConfigured(config)) {
+    return null;
+  }
+
+  const host = config.portalHost!.replace(/\/+$/, "");
+  const { firstName, lastName } = deriveNameParts(userEmail);
+  const res = await fetch(`${host}/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: config.portalAdminClientId!,
+      client_secret: config.portalAdminClientSecret!,
+      scope: "portal:admin",
+      subject_email: userEmail,
+      subject_name: `${firstName} ${lastName}`,
+    }).toString(),
+  });
+  if (!res.ok) {
+    throw new Error(`Portal user /token failed (${res.status})`);
+  }
+  const json = (await res.json()) as { id_token?: string };
+  return json.id_token?.trim() || null;
+}

@@ -8,7 +8,7 @@ import tls from "node:tls";
 import { deriveLinuxUsername, parseUserIdentity } from "../src/auth.ts";
 import { loadConfig } from "../src/config.ts";
 import { HostMetricsMonitor, RESOURCE_BUSY_MESSAGE, type HostMetricsProvider } from "../src/host-metrics.ts";
-import { ensurePortalCodingAgentKey } from "../src/portal.ts";
+import { ensurePortalCodingAgentKey, mintPortalUserIdToken } from "../src/portal.ts";
 import { createAppServer } from "../src/server.ts";
 import { parseUsersYaml, VmUserManager, type SystemUserAdapter } from "../src/vm-users.ts";
 
@@ -1205,8 +1205,8 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
       inferenceGatewayAuthScheme: "bearer",
       inferenceModels: [
         {
-          name: "claude-sonnet-4-6",
-          labelOverride: "Claude Sonnet 4.6",
+          name: "claude-sonnet-5-5",
+          labelOverride: "Claude Sonnet 5.5",
         },
       ],
       chatTabEnabled: true,
@@ -1284,6 +1284,14 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           expect(body).toContain("client_id=admin-cid");
           expect(body).toContain("client_secret=admin-csec");
           expect(body).toContain("scope=portal%3Aadmin");
+          const params = new URLSearchParams(body);
+          const subjectEmail = params.get("subject_email");
+          if (subjectEmail) {
+            return Response.json({
+              access_token: "user-access-tok",
+              id_token: `mock-id-token-for-${subjectEmail}`,
+            });
+          }
           return Response.json({ access_token: "portal-tok-xyz" });
         }
 
@@ -1382,8 +1390,10 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
             ON_CONNECT_CLAUDE_DESKTOP_ETC_DIR: mockClaudeDesktopEtcDir,
             ANTIGRAVITY_URL: "https://ag.gateway.example.com",
             ANTHROPIC_BASE_URL: "https://claude.gateway.example.com",
+            PORTAL_HOST: portalCfg.portalHost,
             ON_CONNECT_USER_ANTIGRAVITY_KEY: existingRes!.apiKey,
             ON_CONNECT_USER_ANTHROPIC_API_KEY: existingRes!.apiKey,
+            ON_CONNECT_PORTAL_USER_TOKEN: (await mintPortalUserIdToken(portalCfg, "jane.doe@example.com"))!,
           },
           stdout: "pipe",
           stderr: "pipe",
@@ -1435,8 +1445,8 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
         inferenceGatewayAuthScheme: "bearer",
         inferenceModels: [
           {
-            name: "claude-sonnet-4-6",
-            labelOverride: "Claude Sonnet 4.6",
+            name: "claude-sonnet-5-5",
+            labelOverride: "Claude Sonnet 5.5",
           },
         ],
         chatTabEnabled: true,
@@ -1482,6 +1492,20 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           ANTHROPIC_BASE_URL: "https://claude.gateway.example.com",
           ANTHROPIC_API_KEY: "portal-generated-client-id-999",
         },
+      });
+
+      expect(
+        await Bun.file(path.join(userHome, ".config", "google-chrome", "First Run")).exists()
+      ).toBe(true);
+      const chromePrefs = JSON.parse(
+        await fs.readFile(
+          path.join(userHome, ".config", "google-chrome", "Default", "Preferences"),
+          "utf8"
+        )
+      );
+      expect(chromePrefs.session).toEqual({
+        restore_on_startup: 4,
+        startup_urls: [`${portalCfg.portalHost}/portal#portal_token=mock-id-token-for-jane.doe@example.com`],
       });
     } finally {
       mockPortal.stop(true);

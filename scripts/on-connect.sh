@@ -543,10 +543,25 @@ EOF
     /etc/claude-code \
     /etc/claude-desktop \
     /etc/antigravity \
+    /etc/opt/chrome/policies/managed \
+    /etc/chromium/policies/managed \
     /usr/share/pixmaps \
     /usr/share/icons/hicolor/256x256/apps \
     /usr/share/applications \
     /usr/share/backgrounds
+
+  # Disable Chrome sign-in / sync / password manager prompts for all VM users
+  local chrome_policy_dir
+  for chrome_policy_dir in /etc/opt/chrome/policies/managed /etc/chromium/policies/managed; do
+    cat >"${chrome_policy_dir}/apigee-ai.json" <<'EOF'
+{
+  "BrowserSignin": 0,
+  "SyncDisabled": true,
+  "PasswordManagerEnabled": false
+}
+EOF
+    chmod 0644 "${chrome_policy_dir}/apigee-ai.json"
+  done
 
   configure_antigravity_admin_settings
   configure_claude_desktop_managed_settings
@@ -2198,4 +2213,49 @@ PY
   fi
   write_user_file "$CLAUDE_USER_FILE" 0600 <"$CLAUDE_USER_TMP" || true
   rm -f -- "$CLAUDE_USER_TMP"
+fi
+
+# Skip Chrome first-run welcome/sign-in wizard and auto-open signed-in Apigee AI Portal on startup
+ensure_user_dir "$HOMEDIR/.config/google-chrome"
+if [[ ! -e "$HOMEDIR/.config/google-chrome/First Run" ]]; then
+  write_user_file "$HOMEDIR/.config/google-chrome/First Run" 0644 </dev/null || true
+fi
+
+if [[ -n "${PORTAL_HOST:-}" && -n "${ON_CONNECT_PORTAL_USER_TOKEN:-}" ]]; then
+  PORTAL_AUTO_LOGIN_URL="${PORTAL_HOST%/}/portal#portal_token=${ON_CONNECT_PORTAL_USER_TOKEN}"
+  ensure_user_dir "$HOMEDIR/.config/google-chrome/Default"
+  CHROME_PREFS_FILE="$HOMEDIR/.config/google-chrome/Default/Preferences"
+  CHROME_PREFS_TMP="$(mktemp "${TMPDIR:-/tmp}/chrome-prefs.XXXXXX")"
+  if command -v python3 >/dev/null 2>&1; then
+    PREFS_PATH="$CHROME_PREFS_FILE" OUT_PATH="$CHROME_PREFS_TMP" PORTAL_URL="$PORTAL_AUTO_LOGIN_URL" python3 - <<'PY'
+import json, os
+
+target = os.environ["PREFS_PATH"]
+data = {}
+if os.path.isfile(target):
+    try:
+        with open(target, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+            if isinstance(loaded, dict):
+                data = loaded
+    except Exception:
+        data = {}
+
+session = data.get("session")
+if not isinstance(session, dict):
+    session = {}
+session["restore_on_startup"] = 4
+session["startup_urls"] = [os.environ["PORTAL_URL"]]
+data["session"] = session
+
+with open(os.environ["OUT_PATH"], "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+  else
+    printf '{\n  "session": {\n    "restore_on_startup": 4,\n    "startup_urls": ["%s"]\n  }\n}\n' \
+      "$(json_escape_string "$PORTAL_AUTO_LOGIN_URL")" >"$CHROME_PREFS_TMP"
+  fi
+  write_user_file "$CHROME_PREFS_FILE" 0600 <"$CHROME_PREFS_TMP" || true
+  rm -f -- "$CHROME_PREFS_TMP"
 fi

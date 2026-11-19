@@ -10,7 +10,11 @@ import {
   EMBEDDED_ON_CONNECT_SCRIPT,
   EMBEDDED_WALLPAPER_JPG,
 } from "./embedded-assets.ts";
-import { ensurePortalCodingAgentKey, isPortalConfigured } from "./portal.ts";
+import {
+  ensurePortalCodingAgentKey,
+  isPortalConfigured,
+  mintPortalUserIdToken,
+} from "./portal.ts";
 
 export interface StoredUserEntry {
   email: string;
@@ -592,6 +596,19 @@ export class VmUserManager {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(
           `${new Date().toISOString()} [portal] Failed provisioning coding-agent-app key for '${options.email}': ${msg}`
+        );
+      }
+
+      try {
+        const userIdToken = await mintPortalUserIdToken(this.config, options.email);
+        if (userIdToken) {
+          portalEnv.ON_CONNECT_PORTAL_USER_TOKEN = userIdToken;
+          portalEnv.PORTAL_HOST = this.config.portalHost!;
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `${new Date().toISOString()} [portal] Failed minting user Portal ID token for '${options.email}': ${msg}`
         );
       }
     }
