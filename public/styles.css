@@ -429,6 +429,20 @@ input:invalid:user-invalid {
   overflow: clip;
 }
 
+.app-layout.is-standalone-desktop {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.app-layout.is-standalone-desktop .topbar,
+.app-layout.is-standalone-desktop .session-bar,
+.app-layout.is-standalone-desktop .nav-rail {
+  display: none;
+}
+
+.app-layout.is-standalone-desktop .main-stage {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .topbar {
   height: 52px;
   flex-shrink: 0;

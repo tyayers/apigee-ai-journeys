@@ -195,6 +195,9 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     expect(html).not.toContain("Fit display");
     expect(html).toContain('<div class="nav-heading">Links</div>');
     expect(html).not.toContain("Demo Cases");
+    const cssRes = await fetch(`${baseUrl}/styles.css`);
+    const css = await cssRes.text();
+    expect(css).toContain(".app-layout.is-standalone-desktop");
     expect(html).not.toContain("{{CSP_NONCE}}");
 
     const headRoot = await fetch(`${baseUrl}/`, { method: "HEAD" });

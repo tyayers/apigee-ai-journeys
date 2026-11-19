@@ -381,6 +381,7 @@ function renderAuthenticatedWorkspace() {
   el.logoutBtn.hidden = state.authSource === "iap";
 
   if (state.isStandaloneTab) {
+    el.workspaceView.classList.add("is-standalone-desktop");
     el.navRail.hidden = true;
     el.navToggleBtn.hidden = true;
     el.openNewTabLink.hidden = true;
@@ -390,6 +391,7 @@ function renderAuthenticatedWorkspace() {
       handoffChannel.postMessage({ type: "claimed_standalone_tab", username: state.user.username });
     }
   } else {
+    el.workspaceView.classList.remove("is-standalone-desktop");
     el.standaloneBadge.hidden = true;
     el.openNewTabLink.hidden = false;
   }
