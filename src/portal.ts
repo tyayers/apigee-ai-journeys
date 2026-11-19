@@ -69,14 +69,20 @@ export function isPortalConfigured(config: Pick<AppConfig, "portalHost" | "porta
   );
 }
 
+export function deriveDesktopAppName(email: string): string {
+  const local = (email.split("@")[0] ?? "user").trim().toLowerCase();
+  const safeName = local.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "user";
+  return `${safeName}-desktop-app`;
+}
+
 /**
- * Ensures the user exists in the Apigee Developer Portal and has a `coding-agent-app`
+ * Ensures the user exists in the Apigee Developer Portal and has a `{Name}-desktop-app`
  * subscribed to `coding-agent-product`, returning its `clientId` API key.
  */
 export async function ensurePortalCodingAgentKey(
   config: Pick<AppConfig, "portalHost" | "portalAdminClientId" | "portalAdminClientSecret">,
   userEmail: string,
-  appName = "coding-agent-app",
+  appName = deriveDesktopAppName(userEmail),
   apiProduct = "coding-agent-product"
 ): Promise<PortalProvisionResult | null> {
   if (!isPortalConfigured(config)) {

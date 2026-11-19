@@ -557,7 +557,8 @@ EOF
 {
   "BrowserSignin": 0,
   "SyncDisabled": true,
-  "PasswordManagerEnabled": false
+  "PasswordManagerEnabled": false,
+  "DefaultBrowserSettingEnabled": false
 }
 EOF
     chmod 0644 "${chrome_policy_dir}/apigee-ai.json"
@@ -1798,6 +1799,9 @@ pos=@Point(16 616)
 
 [Trash]
 pos=@Point(16 716)
+
+[apigee-portal.desktop]
+pos=@Point(116 16)
 EOF
 }
 
@@ -1981,11 +1985,27 @@ write_desktop_shortcut "$ANTIGRAVITY_DESKTOP_PATH" "$DESKTOP_DIR/antigravity.des
 write_desktop_shortcut "$CLAUDE_DESKTOP_PATH" "$DESKTOP_DIR/claude.desktop" "Claude"
 write_desktop_shortcut "$CONFIG_DESKTOP_PATH" "$DESKTOP_DIR/lxqt-config.desktop" "Settings" "preferences-desktop"
 
+if [[ -n "${PORTAL_HOST:-}" ]]; then
+  PORTAL_SHORTCUT_URL="${PORTAL_HOST%/}/portal"
+  if [[ -n "${ON_CONNECT_PORTAL_USER_TOKEN:-}" ]]; then
+    PORTAL_SHORTCUT_URL="${PORTAL_SHORTCUT_URL}#portal_token=${ON_CONNECT_PORTAL_USER_TOKEN}"
+  fi
+  {
+    printf '[Desktop Entry]\n'
+    printf 'Version=1.0\n'
+    printf 'Type=Link\n'
+    printf 'Name=Apigee AI Portal\n'
+    printf 'Comment=Open Apigee AI Developer Portal\n'
+    printf 'Icon=google-chrome\n'
+    printf 'URL=%s\n' "$PORTAL_SHORTCUT_URL"
+  } | write_user_file "$DESKTOP_DIR/apigee-portal.desktop" 0644 || true
+fi
+
 # Remove any other stale .desktop shortcut names left in ~/Desktop from previous runs
 for existing_desk in "$DESKTOP_DIR"/*.desktop; do
   [[ ! -e "$existing_desk" ]] && continue
   case "$(basename -- "$existing_desk")" in
-    qterminal.desktop|google-chrome.desktop|codium.desktop|antigravity.desktop|claude.desktop|lxqt-config.desktop) ;;
+    qterminal.desktop|google-chrome.desktop|codium.desktop|antigravity.desktop|claude.desktop|lxqt-config.desktop|apigee-portal.desktop) ;;
     *) rm -f -- "$existing_desk" ;;
   esac
 done
@@ -2215,7 +2235,25 @@ PY
   rm -f -- "$CLAUDE_USER_TMP"
 fi
 
-# Skip Chrome first-run welcome/sign-in wizard and auto-open signed-in Apigee AI Portal on startup
+# Skip Chrome first-run welcome/sign-in wizard, set Chrome as default browser, and auto-open signed-in Apigee AI Portal on startup
+DEFAULT_BROWSER_DESKTOP="$(basename -- "$CHROME_DESKTOP_PATH")"
+DEFAULT_BROWSER_DESKTOP="${DEFAULT_BROWSER_DESKTOP:-google-chrome.desktop}"
+ensure_user_dir "$HOMEDIR/.config"
+write_user_file "$HOMEDIR/.config/mimeapps.list" 0644 <<EOF || true
+[Default Applications]
+x-scheme-handler/http=${DEFAULT_BROWSER_DESKTOP}
+x-scheme-handler/https=${DEFAULT_BROWSER_DESKTOP}
+text/html=${DEFAULT_BROWSER_DESKTOP}
+application/xhtml+xml=${DEFAULT_BROWSER_DESKTOP}
+x-scheme-handler/about=${DEFAULT_BROWSER_DESKTOP}
+
+[Added Associations]
+x-scheme-handler/http=${DEFAULT_BROWSER_DESKTOP};
+x-scheme-handler/https=${DEFAULT_BROWSER_DESKTOP};
+text/html=${DEFAULT_BROWSER_DESKTOP};
+application/xhtml+xml=${DEFAULT_BROWSER_DESKTOP};
+EOF
+
 ensure_user_dir "$HOMEDIR/.config/google-chrome"
 if [[ ! -e "$HOMEDIR/.config/google-chrome/First Run" ]]; then
   write_user_file "$HOMEDIR/.config/google-chrome/First Run" 0644 </dev/null || true

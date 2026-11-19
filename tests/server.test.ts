@@ -1314,7 +1314,7 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           if (req.method === "POST") {
             const payload = (await req.json()) as { name: string; apiProducts: string[] };
             expect(payload).toEqual({
-              name: "coding-agent-app",
+              name: "jane-doe-desktop-app",
               apiProducts: ["coding-agent-product"],
             });
             const created = {
@@ -1507,6 +1507,19 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
         restore_on_startup: 4,
         startup_urls: [`${portalCfg.portalHost}/portal#portal_token=mock-id-token-for-jane.doe@example.com`],
       });
+
+      const mimeapps = await fs.readFile(path.join(userHome, ".config", "mimeapps.list"), "utf8");
+      expect(mimeapps).toContain("x-scheme-handler/http=apigee-chrome.desktop");
+      expect(mimeapps).toContain("x-scheme-handler/https=apigee-chrome.desktop");
+
+      const portalDesktop = await fs.readFile(
+        path.join(userHome, "Desktop", "apigee-portal.desktop"),
+        "utf8"
+      );
+      expect(portalDesktop).toContain("Name=Apigee AI Portal");
+      expect(portalDesktop).toContain(
+        `URL=${portalCfg.portalHost}/portal#portal_token=mock-id-token-for-jane.doe@example.com`
+      );
     } finally {
       mockPortal.stop(true);
     }
