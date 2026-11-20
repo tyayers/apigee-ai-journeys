@@ -1413,20 +1413,6 @@ NoDisplay=true
 Categories=Settings;DesktopSettings;Qt;LXQt;
 EOF
 
-APPMENU_LAUNCHER_PATH="$USER_APPS_DIR/apigee-app-menu.desktop"
-write_user_file "$APPMENU_LAUNCHER_PATH" 0644 <<'EOF' || true
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Applications
-Comment=Open Applications Menu
-Exec=sh -c 'bus=$(busctl --user list 2>/dev/null | awk "/lxqt-panel/{print \$1; exit}"); if [ -n "$bus" ]; then busctl --user call "$bus" /global_key_shortcuts/panel/mainmenu/show_hide org.lxqt.global_key_shortcuts.client.activated; else lxqt-runner; fi'
-Icon=start-here
-Terminal=false
-NoDisplay=true
-Categories=System;
-EOF
-
 LXQT_MENU_FILE="/etc/xdg/menus/lxqt-applications.menu"
 if [[ ! -f "$LXQT_MENU_FILE" && -f /etc/xdg/menus/lxqt-panel-applications.menu ]]; then
   LXQT_MENU_FILE="/etc/xdg/menus/lxqt-panel-applications.menu"
@@ -1666,7 +1652,6 @@ launcher_icon_theme = Adwaita
 launcher_icon_theme_override = 0
 startup_notifications = 1
 launcher_tooltip = 1
-launcher_item_app = $APPMENU_LAUNCHER_PATH
 launcher_item_app = $HOME_LAUNCHER_PATH
 launcher_item_app = $ANTIGRAVITY_DESKTOP_PATH
 launcher_item_app = $CLAUDE_DESKTOP_PATH
