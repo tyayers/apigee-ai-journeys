@@ -457,12 +457,16 @@ function renderAuthenticatedWorkspace() {
     el.openNewTabLink.hidden = true;
     if (el.standaloneDrawerToggle) el.standaloneDrawerToggle.hidden = false;
     setStandaloneDrawerOpen(false);
-    document.title = `Desktop (${state.user.username}) · Apigee AI Journeys`;
+    document.title = `Desktop (${state.user.username}) · Apigee AI CloudTop`;
     if (handoffChannel) {
       handoffChannel.postMessage({ type: "claimed_standalone_tab", username: state.user.username });
     }
   } else {
     el.workspaceView.classList.remove("is-standalone-desktop");
+    const sidebarCollapsed = localStorage.getItem("sidebar-collapsed") === "true";
+    el.navRail.hidden = sidebarCollapsed;
+    el.navToggleBtn.hidden = false;
+    el.navToggleBtn.setAttribute("aria-expanded", String(!sidebarCollapsed));
     el.openNewTabLink.hidden = false;
     if (el.standaloneDrawerToggle) el.standaloneDrawerToggle.hidden = true;
     setStandaloneDrawerOpen(false);
@@ -512,6 +516,7 @@ async function bootstrap() {
     const nextHidden = !el.navRail.hidden;
     el.navRail.hidden = nextHidden;
     el.navToggleBtn.setAttribute("aria-expanded", String(!nextHidden));
+    localStorage.setItem("sidebar-collapsed", String(nextHidden));
   });
 
   el.topbarMoreBtn?.addEventListener("click", (event) => {
