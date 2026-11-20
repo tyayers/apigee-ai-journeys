@@ -722,7 +722,8 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     expect(tint2Conf).toContain("panel_position = bottom center horizontal");
     const sessionConf = await fs.readFile(path.join(freshHome, ".config", "lxqt", "session.conf"), "utf8");
     expect(sessionConf).toContain('layout="us,de,fr,es"');
-    expect(tint2Conf).toContain("background_color = #000000 0");
+    expect(tint2Conf).toContain("rounded = 14");
+    expect(tint2Conf).toContain("background_color = #1e1e1e 72");
     expect(tint2Conf).toContain("launcher_icon_size = 48");
     expect(tint2Conf).toContain(
       [

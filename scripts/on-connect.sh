@@ -1553,16 +1553,16 @@ fi
 TINT2_CONF="$HOMEDIR/.config/tint2/tint2rc"
 write_user_file "$TINT2_CONF" 0644 <<EOF || true
 # Apigee AI Demos — tint2 bottom launcher dock
-# Background 1: transparent panel
-rounded = 12
-border_width = 0
+# Background 1: dark gray translucent panel with rounded corners
+rounded = 14
+border_width = 1
 border_sides = TBLR
-background_color = #000000 0
-border_color = #000000 0
-background_color_hover = #000000 0
-border_color_hover = #000000 0
-background_color_pressed = #000000 0
-border_color_pressed = #000000 0
+background_color = #1e1e1e 72
+border_color = #ffffff 18
+background_color_hover = #1e1e1e 72
+border_color_hover = #ffffff 18
+background_color_pressed = #1e1e1e 72
+border_color_pressed = #ffffff 18
 
 # Background 2: subtle translucent pill for active/hovered running task icons
 rounded = 10
