@@ -1575,8 +1575,8 @@ border_color_hover = #ffffff 0
 background_color_pressed = #ffffff 35
 border_color_pressed = #ffffff 0
 
-# Panel geometry: auto-width centered at bottom (Launchers + icon-only running Taskbar)
-panel_items = LT
+# Panel geometry: auto-width centered at bottom (Launchers | separator | icon-only running Taskbar)
+panel_items = L:T
 panel_size = 0 60
 panel_margin = 0 8
 panel_padding = 8 4 8
@@ -1592,6 +1592,14 @@ strut_policy = follow_size
 panel_window_name = tint2
 disable_transparency = 0
 mouse_effects = 1
+
+# Divider between shortcuts and running applications
+separator = new
+separator_background_id = 0
+separator_color = #ffffff 28
+separator_style = line
+separator_size = 1
+separator_padding = 6 10
 
 # Taskbar / running apps (icon-only next to launchers)
 taskbar_mode = single_desktop

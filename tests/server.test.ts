@@ -715,7 +715,8 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     expect(firstPass).toContain("# [panel2]");
 
     const tint2Conf = await fs.readFile(path.join(freshHome, ".config", "tint2", "tint2rc"), "utf8");
-    expect(tint2Conf).toContain("panel_items = LT");
+    expect(tint2Conf).toContain("panel_items = L:T");
+    expect(tint2Conf).toContain("separator_style = line");
     expect(tint2Conf).toContain("task_text = 0");
     expect(tint2Conf).toContain("task_icon = 1");
     expect(tint2Conf).toContain("task_thumbnail = 1");
