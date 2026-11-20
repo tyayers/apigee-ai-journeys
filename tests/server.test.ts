@@ -728,6 +728,7 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     expect(tint2Conf).toContain("launcher_icon_size = 48");
     expect(tint2Conf).toContain(
       [
+        `launcher_item_app = ${path.join(freshHome, ".local", "share", "applications", "apigee-app-menu.desktop")}`,
         `launcher_item_app = ${path.join(mockAppsDir, "apigee-user-home.desktop")}`,
         `launcher_item_app = ${path.join(mockAppsDir, "antigravity.desktop")}`,
         `launcher_item_app = ${path.join(mockAppsDir, "com.anthropic.Claude.desktop")}`,
