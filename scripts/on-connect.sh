@@ -2243,6 +2243,74 @@ PY
   rm -f -- "$CLAUDE_USER_TMP"
 fi
 
+# Configure apigee-portal MCP server for Antigravity, Claude Code, and Claude Desktop when PORTAL_HOST is set
+upsert_mcp_server_json() {
+  local target_file="$1"
+  local server_name="$2"
+  local entry_json="$3"
+  local file_mode="${4:-0600}"
+  local tmp_out
+  tmp_out="$(mktemp "${TMPDIR:-/tmp}/mcp-config.XXXXXX")"
+
+  if command -v python3 >/dev/null 2>&1; then
+    TARGET_PATH="$target_file" \
+    OUT_PATH="$tmp_out" \
+    SERVER_NAME="$server_name" \
+    ENTRY_JSON="$entry_json" \
+    python3 - <<'PY'
+import json, os
+
+target = os.environ["TARGET_PATH"]
+data = {}
+if os.path.isfile(target):
+    try:
+        with open(target, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+            if isinstance(loaded, dict):
+                data = loaded
+    except Exception:
+        data = {}
+
+mcp_servers = data.get("mcpServers")
+if not isinstance(mcp_servers, dict):
+    mcp_servers = {}
+
+mcp_servers[os.environ["SERVER_NAME"]] = json.loads(os.environ["ENTRY_JSON"])
+data["mcpServers"] = mcp_servers
+
+with open(os.environ["OUT_PATH"], "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+  else
+    printf '{\n  "mcpServers": {\n    "%s": %s\n  }\n}\n' \
+      "$(json_escape_string "$server_name")" \
+      "$entry_json" >"$tmp_out"
+  fi
+
+  write_user_file "$target_file" "$file_mode" <"$tmp_out" || true
+  rm -f -- "$tmp_out"
+}
+
+MCP_PORTAL_HOST="${PORTAL_HOST:-${PORT_HOST:-}}"
+if [[ -n "$MCP_PORTAL_HOST" ]]; then
+  APIGEE_PORTAL_MCP_URL="${MCP_PORTAL_HOST%/}/api/portals/mcp"
+  APIGEE_PORTAL_MCP_URL_ESC="$(json_escape_string "$APIGEE_PORTAL_MCP_URL")"
+
+  # Antigravity (global ~/.gemini/config/mcp_config.json + ~/.gemini/antigravity/mcp_config.json)
+  ANTIGRAVITY_MCP_ENTRY="{\"url\": \"${APIGEE_PORTAL_MCP_URL_ESC}\"}"
+  upsert_mcp_server_json "$HOMEDIR/.gemini/config/mcp_config.json" "apigee-portal" "$ANTIGRAVITY_MCP_ENTRY" 0600
+  upsert_mcp_server_json "$HOMEDIR/.gemini/antigravity/mcp_config.json" "apigee-portal" "$ANTIGRAVITY_MCP_ENTRY" 0600
+
+  # Claude Code (~/.claude.json)
+  CLAUDE_CODE_MCP_ENTRY="{\"type\": \"http\", \"url\": \"${APIGEE_PORTAL_MCP_URL_ESC}\"}"
+  upsert_mcp_server_json "$HOMEDIR/.claude.json" "apigee-portal" "$CLAUDE_CODE_MCP_ENTRY" 0600
+
+  # Claude Desktop (~/.config/Claude/claude_desktop_config.json)
+  CLAUDE_DESKTOP_MCP_ENTRY="{\"command\": \"npx\", \"args\": [\"-y\", \"mcp-remote\", \"${APIGEE_PORTAL_MCP_URL_ESC}\"]}"
+  upsert_mcp_server_json "$HOMEDIR/.config/Claude/claude_desktop_config.json" "apigee-portal" "$CLAUDE_DESKTOP_MCP_ENTRY" 0600
+fi
+
 # Skip Chrome first-run welcome/sign-in wizard, set Chrome as default browser, and auto-open signed-in Apigee AI Portal on startup
 DEFAULT_BROWSER_DESKTOP="$(basename -- "$CHROME_DESKTOP_PATH")"
 DEFAULT_BROWSER_DESKTOP="${DEFAULT_BROWSER_DESKTOP:-google-chrome.desktop}"

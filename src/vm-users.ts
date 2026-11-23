@@ -581,8 +581,11 @@ export class VmUserManager {
     }
 
     const portalEnv: Record<string, string> = {};
+    if (this.config.portalHost) {
+      portalEnv.PORTAL_HOST = this.config.portalHost;
+    }
     if (options?.email && isPortalConfigured(this.config)) {
-      options.onProgress?.("Provisioning developer API key...");
+      options.onProgress?.("Loading user data...");
       try {
         const portalResult = await ensurePortalCodingAgentKey(this.config, options.email);
         if (portalResult?.apiKey) {
@@ -603,7 +606,6 @@ export class VmUserManager {
         const userIdToken = await mintPortalUserIdToken(this.config, options.email);
         if (userIdToken) {
           portalEnv.ON_CONNECT_PORTAL_USER_TOKEN = userIdToken;
-          portalEnv.PORTAL_HOST = this.config.portalHost!;
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

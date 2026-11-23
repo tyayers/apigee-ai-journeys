@@ -1393,6 +1393,10 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
         path.join(mockClaudeEtcDir, "managed-settings.json"),
         JSON.stringify({ env: { DISABLE_AUTOUPDATER: "1", ANTHROPIC_API_KEY: "stale-old-key" } })
       );
+      await fs.writeFile(
+        path.join(userHome, ".claude.json"),
+        JSON.stringify({ theme: "dark", mcpServers: { other: { command: "echo" } } })
+      );
 
       const proc = Bun.spawn(
         ["/bin/bash", path.resolve("scripts/on-connect.sh"), "janedoe", userHome],
@@ -1535,6 +1539,58 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
       expect(portalDesktop).toContain(
         `URL=${portalCfg.portalHost}/portal#portal_token=mock-id-token-for-jane.doe@example.com`
       );
+
+      const expectedMcpUrl = `${portalCfg.portalHost}/api/portals/mcp`;
+      const agGlobalMcp = JSON.parse(
+        await fs.readFile(path.join(userHome, ".gemini", "config", "mcp_config.json"), "utf8")
+      );
+      expect(agGlobalMcp).toEqual({
+        mcpServers: {
+          "apigee-portal": {
+            url: expectedMcpUrl,
+          },
+        },
+      });
+
+      const agLegacyMcp = JSON.parse(
+        await fs.readFile(path.join(userHome, ".gemini", "antigravity", "mcp_config.json"), "utf8")
+      );
+      expect(agLegacyMcp).toEqual({
+        mcpServers: {
+          "apigee-portal": {
+            url: expectedMcpUrl,
+          },
+        },
+      });
+
+      const claudeCodeMcp = JSON.parse(
+        await fs.readFile(path.join(userHome, ".claude.json"), "utf8")
+      );
+      expect(claudeCodeMcp).toEqual({
+        theme: "dark",
+        mcpServers: {
+          other: { command: "echo" },
+          "apigee-portal": {
+            type: "http",
+            url: expectedMcpUrl,
+          },
+        },
+      });
+
+      const claudeDesktopMcp = JSON.parse(
+        await fs.readFile(
+          path.join(userHome, ".config", "Claude", "claude_desktop_config.json"),
+          "utf8"
+        )
+      );
+      expect(claudeDesktopMcp).toEqual({
+        mcpServers: {
+          "apigee-portal": {
+            command: "npx",
+            args: ["-y", "mcp-remote", expectedMcpUrl],
+          },
+        },
+      });
     } finally {
       mockPortal.stop(true);
     }
