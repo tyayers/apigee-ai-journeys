@@ -90,4 +90,14 @@ products:
               limit: "222222"
               interval: "1"
               timeUnit: day
+      - apiSource: REST-AI-Antigravity
+        operations:
+          - name: /
+            methods:
+              - POST
+            model: gemini-3.8-flash
+            llmTokenQuota:
+              limit: "1000"
+              interval: "5"
+              timeUnit: "minutes"
 users: []

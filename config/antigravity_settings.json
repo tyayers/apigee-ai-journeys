@@ -8,7 +8,9 @@
     "defaultModelId": "gemini-4-hydrogen",
     "list": [
       { "modelId": "gemini-4-hydrogen" },
+      { "modelId": "gemini-4-neon" },
       { "modelId": "gemini-4-carbon" },
+      { "modelId": "gemini-3.8-flash" },
       { "modelId": "gemini-3.5-flash-lite" }
     ]
   },
