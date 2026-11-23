@@ -24,12 +24,7 @@ products:
     quota: "100000"
     quotaInterval: "1"
     quotaTimeUnit: month
-    operations:
-      - apiSource: REST-AI-Antigravity
-        operations:
-          - name: /**
-            methods: []
-            quota: {}
+    operations: []
     llmOperations:
       - apiSource: REST-AI-Messages
         operations:
@@ -37,14 +32,20 @@ products:
             methods:
               - POST
             model: claude-sonnet-5-5
-            llmTokenQuota: {}
+            llmTokenQuota:
+              limit: "222222"
+              interval: "1"
+              timeUnit: day
       - apiSource: REST-AI-Messages
         operations:
           - name: /
             methods:
               - POST
             model: claude-opus-5-5
-            llmTokenQuota: {}
+            llmTokenQuota:
+              limit: "222222"
+              interval: "1"
+              timeUnit: day
       - apiSource: REST-AI-Messages
         operations:
           - name: /
@@ -52,4 +53,41 @@ products:
               - POST
             model: claude-haiku-5-5
             llmTokenQuota: {}
+      - apiSource: REST-AI-Antigravity
+        operations:
+          - name: /
+            methods:
+              - POST
+            model: gemini-3.5-flash-lite
+            llmTokenQuota: {}
+      - apiSource: REST-AI-Antigravity
+        operations:
+          - name: /
+            methods:
+              - POST
+            model: gemini-4-carbon
+            llmTokenQuota:
+              limit: "222222"
+              interval: "1"
+              timeUnit: day
+      - apiSource: REST-AI-Antigravity
+        operations:
+          - name: /
+            methods:
+              - POST
+            model: gemini-4-neon
+            llmTokenQuota:
+              limit: "222222"
+              interval: "1"
+              timeUnit: day
+      - apiSource: REST-AI-Antigravity
+        operations:
+          - name: /
+            methods:
+              - POST
+            model: gemini-4-hydrogen
+            llmTokenQuota:
+              limit: "222222"
+              interval: "1"
+              timeUnit: day
 users: []
