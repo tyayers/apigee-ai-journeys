@@ -457,7 +457,7 @@ function renderAuthenticatedWorkspace() {
     el.openNewTabLink.hidden = true;
     if (el.standaloneDrawerToggle) el.standaloneDrawerToggle.hidden = false;
     setStandaloneDrawerOpen(false);
-    document.title = `Desktop (${state.user.username}) · Apigee AI CloudTop`;
+    document.title = `Desktop (${state.user.username}) · Desktop Session`;
     if (handoffChannel) {
       handoffChannel.postMessage({ type: "claimed_standalone_tab", username: state.user.username });
     }

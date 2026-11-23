@@ -192,7 +192,8 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     const csp = res.headers.get("content-security-policy") ?? "";
     expect(csp).toContain("'wasm-unsafe-eval'");
     const html = await res.text();
-    expect(html).toContain("<title>Apigee AI CloudTop</title>");
+    expect(html).toContain("<title>Desktop Session</title>");
+    expect(html).toContain('<span class="topbar-brand-text">Desktop Session</span>');
     expect(html).toContain('href="/favicon.svg"');
     const favRes = await fetch(`${baseUrl}/favicon.svg`);
     expect(favRes.status).toBe(200);
