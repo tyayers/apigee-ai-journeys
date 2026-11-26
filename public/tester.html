@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apigee AI Gateway Tester</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f6f8fa;
+      --surface: #ffffff;
+      --surface-alt: #f0f3f6;
+      --text: #1f2328;
+      --muted: #656d76;
+      --border: #d0d7de;
+      --accent: #0969da;
+      --accent-hover: #0550ae;
+      --accent-soft: rgba(9, 105, 218, 0.1);
+      --danger: #cf222e;
+      --success: #1a7f37;
+      --code-bg: #f0f3f6;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --surface-alt: #1f242c;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --border: #30363d;
+        --accent: #2f81f7;
+        --accent-hover: #58a6ff;
+        --accent-soft: rgba(47, 129, 247, 0.15);
+        --danger: #f85149;
+        --success: #3fb950;
+        --code-bg: #0d1117;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 1.15rem;
+    }
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .app-shell {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem 1rem;
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    @media (max-width: 768px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+    }
+    aside {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.5rem;
+    }
+    .nav-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .nav-tab {
+      width: 100%;
+      text-align: left;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .nav-tab:hover {
+      background: var(--surface-alt);
+    }
+    .nav-tab[aria-selected="true"] {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    main {
+      min-width: 0;
+    }
+    section.panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+    h3 { margin: 1.25rem 0 0.5rem; font-size: 1rem; }
+    .hint {
+      color: var(--muted);
+      font-size: 0.875rem;
+      margin-top: 0.25rem;
+      display: block;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .field {
+      margin-bottom: 1.1rem;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="url"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+    }
+    input:invalid:user-invalid,
+    textarea:invalid:user-invalid {
+      border-color: var(--danger);
+    }
+    textarea {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.875rem;
+      resize: vertical;
+      min-height: 90px;
+    }
+    fieldset {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin: 0 0 1.1rem;
+    }
+    legend {
+      font-weight: 600;
+      padding: 0 0.35rem;
+    }
+    .radio-group {
+      display: flex;
+      gap: 1.1rem;
+      flex-wrap: wrap;
+    }
+    .radio-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-weight: 500;
+      margin: 0;
+      cursor: pointer;
+    }
+    .input-with-action {
+      display: flex;
+      gap: 0.5rem;
+      align-items: stretch;
+    }
+    .input-with-action input {
+      flex: 1;
+      min-width: 0;
+    }
+    button {
+      padding: 0.55rem 1rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+    button.primary:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    :focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+    pre {
+      margin: 0.5rem 0 0;
+      padding: 0.85rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.825rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .status {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .status.ok { color: var(--success); }
+    .status.err { color: var(--danger); }
+    .auth-banner {
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+    .chat-log {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 1rem;
+      min-height: 260px;
+      max-height: 440px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .chat-msg {
+      padding: 0.7rem 0.9rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      max-width: 88%;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.92rem;
+    }
+    .chat-msg.user {
+      align-self: flex-end;
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+    .chat-msg.agent {
+      align-self: flex-start;
+      background: var(--surface);
+    }
+    .chat-msg.tool {
+      align-self: stretch;
+      max-width: 100%;
+      background: var(--code-bg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.8rem;
+    }
+    .chat-msg.err {
+      align-self: stretch;
+      max-width: 100%;
+      border-color: var(--danger);
+      color: var(--danger);
+      background: var(--surface);
+    }
+    .chat-role {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Apigee AI Gateway Tester</h1>
+    </div>
+    <div class="header-actions">
+      <span id="authStatus" class="status" aria-live="polite">✕ No Access Token</span>
+      <button id="copyTokenBtn" type="button" hidden>Copy Access Token</button>
+      <button id="signOutBtn" type="button" hidden>Clear Token</button>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside aria-label="Primary sections">
+      <div class="nav-tabs" role="tablist" aria-orientation="vertical">
+        <button id="tab-config" class="nav-tab" role="tab" type="button" aria-selected="true" aria-controls="panel-config">1. Configuration</button>
+        <button id="tab-router" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-router">2. Test AI Router</button>
+        <button id="tab-a2amcp" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-a2amcp">3. Test A2A / MCP</button>
+        <button id="tab-agent" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-agent">4. Example Agent (A2A)</button>
+      </div>
+    </aside>
+
+    <main>
+      <!-- Tab 1: Configuration (Client Credentials, Token & KVM Management) -->
+      <section id="panel-config" class="panel" role="tabpanel" aria-labelledby="tab-config">
+        <h2>Configuration</h2>
+        <p class="hint">
+          Configure your OAuth 2.1 Client ID &amp; Secret (or pass <code>?client_id=...&amp;client_secret=...</code> in the URL), obtain a scoped JWT from <code>/token</code>, and manage <code>AI-Demo</code> KVM properties.
+        </p>
+
+        <form id="credentialsForm" action="#" method="POST">
+          <fieldset>
+            <legend>Client Credentials &amp; Apigee Host</legend>
+            <div class="grid-2">
+              <div class="field">
+                <label for="clientIdInput">Client ID</label>
+                <input type="text" id="clientIdInput" name="clientIdInput" autocomplete="off" placeholder="Enter OAuth client_id" required>
+              </div>
+              <div class="field">
+                <label for="clientSecretInput">Client Secret</label>
+                <div class="input-with-action">
+                  <input type="password" id="clientSecretInput" name="clientSecretInput" autocomplete="off" placeholder="Enter OAuth client_secret" required>
+                  <button id="toggleSecretBtn" type="button" aria-label="Show client secret">Show</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="apigeeHostInput">Apigee Host</label>
+              <input type="url" id="apigeeHostInput" name="apigeeHostInput" required aria-describedby="apigeeHostHelp">
+              <span id="apigeeHostHelp" class="hint">Base URL for OAuth <code>/token</code> and all Apigee proxy calls (e.g. <code>https://api.apigee-bap7.agenticplatform.dev</code>).</span>
+            </div>
+
+            <div class="row">
+              <button id="saveCredentialsBtn" type="submit" class="primary">Save Credentials &amp; Host</button>
+              <button id="clearCredentialsBtn" type="button">Clear Credentials</button>
+              <span id="credentialsSaveStatus" class="status" aria-live="polite"></span>
+            </div>
+          </fieldset>
+        </form>
+
+        <form id="tokenForm" action="#" method="POST">
+          <fieldset>
+            <legend>OAuth 2.1 Scopes &amp; JWT Token</legend>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="checkbox" name="oauthScope" value="starter-models" checked>
+                starter-models
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" name="oauthScope" value="advanced-models">
+                advanced-models
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" name="oauthScope" value="customer-viewer" checked>
+                customer-viewer
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" name="oauthScope" value="customer-admin">
+                customer-admin
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" name="oauthScope" value="openid" checked>
+                openid
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" name="oauthScope" value="profile" checked>
+                profile
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" name="oauthScope" value="email" checked>
+                email
+              </label>
+            </div>
+            <div class="field" style="margin-top: 0.75rem;">
+              <label for="extraScopes">Additional Scopes (optional, space-separated)</label>
+              <input type="text" id="extraScopes" name="extraScopes" placeholder="e.g. mcp">
+            </div>
+            <div class="row">
+              <button id="getTokenBtn" type="submit" class="primary">Get Access Token</button>
+              <span id="tokenStatus" class="status" aria-live="polite"></span>
+            </div>
+            <div id="tokenSection" hidden style="margin-top: 1rem;">
+              <h3 style="margin-top: 0;">Access Token Claims</h3>
+              <p class="hint">Decoded JWT payload returned by <code>POST /token</code>.</p>
+              <pre id="tokenClaims"></pre>
+            </div>
+          </fieldset>
+        </form>
+
+        <form id="kvmForm" action="#" method="POST">
+          <div class="row" style="justify-content: space-between; margin-bottom: 0.75rem;">
+            <h3 style="margin: 0;">AI-Demo KVM Properties</h3>
+            <div class="row">
+              <button id="loadKvmBtn" type="button">Load from Proxy</button>
+              <button id="saveKvmBtn" type="submit" class="primary">Save to Proxy</button>
+            </div>
+          </div>
+
+          <fieldset>
+            <legend>Region Throttle &amp; Stop Flags</legend>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="checkbox" id="kvm-throttle-europe-west3" name="throttle-europe-west3" checked>
+                throttle-europe-west3
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="kvm-throttle-europe-west10" name="throttle-europe-west10">
+                throttle-europe-west10
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="kvm-throttle-us-east1" name="throttle-us-east1">
+                throttle-us-east1
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="kvm-stop-europe-west3" name="stop-europe-west3">
+                stop-europe-west3
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="kvm-stop-europe-west10" name="stop-europe-west10">
+                stop-europe-west10
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="kvm-stop-us-east1" name="stop-us-east1">
+                stop-us-east1
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="kvm-stop-mcp" name="stop-mcp">
+                stop-mcp
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Smart Router Models &amp; Traffic Percentages</legend>
+            <div class="grid-3">
+              <div class="field">
+                <label for="kvm-lite-model">lite-model</label>
+                <input type="text" id="kvm-lite-model" name="lite-model" value="google/gemini-3.5-flash-lite" required>
+              </div>
+              <div class="field">
+                <label for="kvm-medium-model">medium-model</label>
+                <input type="text" id="kvm-medium-model" name="medium-model" value="google/gemini-4-hydrogen" required>
+              </div>
+              <div class="field">
+                <label for="kvm-thinking-model">thinking-model</label>
+                <input type="text" id="kvm-thinking-model" name="thinking-model" value="google/gemini-4-neon" required>
+              </div>
+            </div>
+            <div class="grid-3">
+              <div class="field" style="margin-bottom: 0;">
+                <label for="kvm-lite-model-percent">lite-model-percent</label>
+                <input type="text" id="kvm-lite-model-percent" name="lite-model-percent" inputmode="numeric" pattern="\d+" value="80" required>
+              </div>
+              <div class="field" style="margin-bottom: 0;">
+                <label for="kvm-medium-model-percent">medium-model-percent</label>
+                <input type="text" id="kvm-medium-model-percent" name="medium-model-percent" inputmode="numeric" pattern="\d+" value="15" required>
+              </div>
+              <div class="field" style="margin-bottom: 0;">
+                <label for="kvm-thinking-model-percent">thinking-model-percent</label>
+                <input type="text" id="kvm-thinking-model-percent" name="thinking-model-percent" inputmode="numeric" pattern="\d+" value="5" required>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Prompt Security Flags</legend>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="checkbox" id="kvm-screen-prompt" name="screen-prompt">
+                Model Armor Screen All Prompts
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="kvm-mask-prompt" name="mask-prompt">
+                DLP Mask PII All Prompts
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Model Overrides</legend>
+            <div id="overrideRows" style="display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 0.75rem;"></div>
+            <button id="addOverrideBtn" type="button">+ Add Model Override</button>
+            <span class="hint">Maps a source model (stored as <code>override-&lt;source&gt;</code> with <code>/</code> replaced by <code>--</code>) to a destination model.</span>
+          </fieldset>
+        </form>
+
+        <div id="kvmResult" hidden style="margin-top: 1rem;">
+          <div id="kvmStatus" class="status" aria-live="polite"></div>
+          <pre id="kvmOutput"></pre>
+        </div>
+      </section>
+
+      <!-- Tab 2: Test AI Router -->
+      <section id="panel-router" class="panel" role="tabpanel" aria-labelledby="tab-router" hidden>
+        <h2>Test AI Router</h2>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Configuration tab first.</div>
+        <p class="hint">
+          Calls <code>ai-platform-router</code> with your token &amp; prompt configuration.
+        </p>
+        <form id="modelForm" action="#" method="POST">
+          <div class="grid-2">
+            <div class="field">
+              <label for="routerEndpoint">AI Router Endpoint</label>
+              <select id="routerEndpoint" name="routerEndpoint">
+                <option value="/airouter/eu/v1/chat/completions">eu (/airouter/eu/v1/chat/completions)</option>
+                <option value="/airouter/europe-west3/v1/chat/completions">europe-west3 (/airouter/europe-west3/v1/chat/completions)</option>
+                <option value="/airouter/europe-west10/v1/chat/completions">europe-west10 (/airouter/europe-west10/v1/chat/completions)</option>
+                <option value="/airouter/us/v1/chat/completions">us (/airouter/us/v1/chat/completions)</option>
+                <option value="/airouter/us-east1/v1/chat/completions">us-east1 (/airouter/us-east1/v1/chat/completions)</option>
+                <option value="/airouter/global/v1/chat/completions">global (/airouter/global/v1/chat/completions)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="modelName">Model</label>
+              <select id="modelName" name="modelName">
+                <option value="google/gemini-4-hydrogen">google/gemini-4-hydrogen</option>
+                <option value="google/gemini-3.5-flash-lite">google/gemini-3.5-flash-lite</option>
+                <option value="google/gemini-4-neon">google/gemini-4-neon</option>
+                <option value="google/gemma-4-26b-a4b-it-maas">google/gemma-4-26b-a4b-it-maas</option>
+                <option value="google/gemini-4-carbon">google/gemini-4-carbon</option>
+                <option value="deepseek-ai/deepseek-v4.1-flash-1017-maas">deepseek-ai/deepseek-v4.1-flash-1017-maas</option>
+                <option value="smart">smart (auto-route lite / medium / thinking)</option>
+              </select>
+            </div>
+          </div>
+
+          <fieldset>
+            <legend>Options &amp; Policy Headers</legend>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="checkbox" id="modelStream" name="modelStream" checked> stream: true
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="forceEuHeader" name="forceEuHeader"> x-data-classification: true
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="screenPromptHeader" name="screenPromptHeader"> x-screen-prompt: true
+              </label>
+              <label class="radio-option">
+                <input type="checkbox" id="maskPromptHeader" name="maskPromptHeader"> x-mask-prompt: true
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="field">
+            <label for="modelPrompt">User Prompt</label>
+            <textarea id="modelPrompt" name="modelPrompt" required>Respond with PONG.</textarea>
+          </div>
+
+          <button id="sendModelBtn" type="submit" class="primary">Send Model Request</button>
+        </form>
+
+        <div id="modelResult" hidden style="margin-top: 1.25rem;">
+          <div id="modelResponseStatus" class="status" aria-live="polite"></div>
+          <pre id="modelResponseOutput"></pre>
+        </div>
+      </section>
+
+      <!-- Tab 4: Test A2A / MCP -->
+      <section id="panel-a2amcp" class="panel" role="tabpanel" aria-labelledby="tab-a2amcp" hidden>
+        <h2>Test Customer A2A &amp; MCP</h2>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Configuration tab first.</div>
+        <p class="hint">
+          Tests <code>customers-a2a-v1</code> and <code>customers-mcp-v1</code> with your configured API key.
+        </p>
+        <form id="customerAgentForm" action="#" method="POST">
+          <div class="field">
+            <label for="agentPreset">Preset Call</label>
+            <select id="agentPreset" name="agentPreset">
+              <option value="a2a_card">A2A: Get Agent Card (GET /.well-known/agent.json)</option>
+              <option value="a2a_list_customers">A2A: list_customers (POST /a2a)</option>
+              <option value="a2a_get_customer">A2A: get_customer CUST-1001 (POST /a2a)</option>
+              <option value="a2a_update_customer">A2A: update_customer CUST-1001 (POST /a2a)</option>
+              <option value="mcp_tools_list">MCP: tools/list (POST /mcp)</option>
+              <option value="mcp_list_customers">MCP: list_customers (POST /mcp)</option>
+              <option value="mcp_get_customer">MCP: get_customer CUST-1001 (POST /mcp)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="agentUrl">Endpoint URL</label>
+            <input type="url" id="agentUrl" name="agentUrl" required>
+          </div>
+
+          <div class="field" id="agentBodyField">
+            <label for="agentBody">JSON-RPC Payload</label>
+            <textarea id="agentBody" name="agentBody"></textarea>
+          </div>
+
+          <button id="sendAgentBtn" type="submit" class="primary">Send A2A / MCP Request</button>
+        </form>
+
+        <div id="agentResult" hidden style="margin-top: 1.25rem;">
+          <div id="agentResponseStatus" class="status" aria-live="polite"></div>
+          <pre id="agentResponseOutput"></pre>
+        </div>
+      </section>
+
+      <!-- Tab 5: Example Agent (A2A Chat) -->
+      <section id="panel-agent" class="panel" role="tabpanel" aria-labelledby="tab-agent" hidden>
+        <div class="row" style="justify-content: space-between; margin-bottom: 0.75rem;">
+          <div>
+            <h2 style="margin-bottom: 0.2rem;">Example Customer Agent (A2A + AI Router)</h2>
+            <span class="hint" style="margin-top: 0;">Uses the AI Router Model API to plan and invoke A2A skills using your configured API key.</span>
+          </div>
+          <button id="newChatBtn" type="button">New Chat</button>
+        </div>
+
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Configuration tab first.</div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="chatRouterEndpoint">AI Router Endpoint</label>
+            <select id="chatRouterEndpoint" name="chatRouterEndpoint">
+              <option value="/airouter/eu/v1/chat/completions">eu (/airouter/eu/v1/chat/completions)</option>
+              <option value="/airouter/europe-west3/v1/chat/completions">europe-west3 (/airouter/europe-west3/v1/chat/completions)</option>
+              <option value="/airouter/europe-west10/v1/chat/completions">europe-west10 (/airouter/europe-west10/v1/chat/completions)</option>
+              <option value="/airouter/us/v1/chat/completions">us (/airouter/us/v1/chat/completions)</option>
+              <option value="/airouter/us-east1/v1/chat/completions">us-east1 (/airouter/us-east1/v1/chat/completions)</option>
+              <option value="/airouter/global/v1/chat/completions">global (/airouter/global/v1/chat/completions)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="chatModel">Model</label>
+            <select id="chatModel" name="chatModel">
+              <option value="google/gemini-4-hydrogen">google/gemini-4-hydrogen</option>
+              <option value="google/gemini-3.5-flash-lite">google/gemini-3.5-flash-lite</option>
+              <option value="google/gemini-4-neon">google/gemini-4-neon</option>
+              <option value="google/gemma-4-26b-a4b-it-maas">google/gemma-4-26b-a4b-it-maas</option>
+              <option value="google/gemini-4-carbon">google/gemini-4-carbon</option>
+              <option value="deepseek-ai/deepseek-v4.1-flash-1017-maas">deepseek-ai/deepseek-v4.1-flash-1017-maas</option>
+              <option value="smart">smart (auto-route lite / medium / thinking)</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="chatLog" class="chat-log" aria-live="polite"></div>
+
+        <form id="chatForm" action="#" method="POST">
+          <div class="field">
+            <label for="chatInput">Message</label>
+            <textarea id="chatInput" name="chatInput" placeholder="e.g. List our active customers, or check details for CUST-1001" required style="min-height: 68px; font-family: inherit;"></textarea>
+          </div>
+          <button id="sendChatBtn" type="submit" class="primary">Send Message</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const API_CONFIG = {
+      defaultHost: "https://api.apigee-bap7.agenticplatform.dev",
+      tokenPath: "/token",
+      kvmPath: "/aikvm/v1/config",
+      a2aPath: "/v1/a2a/customers",
+      mcpPath: "/v1/mcp/customers"
+    };
+
+    const STORAGE_KEYS = {
+      clientId: "apigee_client_id",
+      clientSecret: "apigee_client_secret",
+      apigeeHost: "apigee_host",
+      selectedScopes: "apigee_selected_scopes",
+      extraScopes: "apigee_extra_scopes",
+      accessToken: "apigee_access_token",
+      activeTab: "apigee_active_tab"
+    };
+
+    const KVM_BOOLEAN_KEYS = [
+      "throttle-europe-west3",
+      "throttle-europe-west10",
+      "throttle-us-east1",
+      "stop-europe-west3",
+      "stop-europe-west10",
+      "stop-us-east1",
+      "stop-mcp",
+      "screen-prompt",
+      "mask-prompt"
+    ];
+
+    const KVM_TEXT_KEYS = [
+      "lite-model",
+      "medium-model",
+      "thinking-model",
+      "lite-model-percent",
+      "medium-model-percent",
+      "thinking-model-percent"
+    ];
+
+    const DEFAULT_OVERRIDES = [
+      { source: "google/gemini-4-neon", target: "google/gemini-4-hydrogen" },
+      { source: "google/gemini-4-carbon", target: "google/gemini-4-hydrogen" }
+    ];
+
+    // --- Tab switching (with keyboard arrow support) ---
+    const tabButtons = Array.from(document.querySelectorAll('[role="tab"]'));
+    const tabPanels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+    function activateTab(tabId) {
+      tabButtons.forEach((btn) => {
+        const isSelected = btn.id === tabId;
+        btn.setAttribute("aria-selected", isSelected ? "true" : "false");
+        btn.tabIndex = isSelected ? 0 : -1;
+      });
+      tabPanels.forEach((panel) => {
+        const btnId = panel.getAttribute("aria-labelledby");
+        panel.hidden = btnId !== tabId;
+      });
+      sessionStorage.setItem(STORAGE_KEYS.activeTab, tabId);
+    }
+
+    tabButtons.forEach((btn, idx) => {
+      btn.addEventListener("click", () => activateTab(btn.id));
+      btn.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+          e.preventDefault();
+          const next = tabButtons[(idx + 1) % tabButtons.length];
+          activateTab(next.id);
+          next.focus();
+        } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          const prev = tabButtons[(idx - 1 + tabButtons.length) % tabButtons.length];
+          activateTab(prev.id);
+          prev.focus();
+        }
+      });
+    });
+
+    // --- Helpers ---
+    function randomBase64Url(byteLength = 32) {
+      const bytes = new Uint8Array(byteLength);
+      crypto.getRandomValues(bytes);
+      let binary = "";
+      for (const b of bytes) binary += String.fromCharCode(b);
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+
+    function getAccessToken() {
+      return (sessionStorage.getItem(STORAGE_KEYS.accessToken) || "").trim();
+    }
+
+    function getClientId() {
+      return (localStorage.getItem(STORAGE_KEYS.clientId) || "").trim();
+    }
+
+    function getClientSecret() {
+      return (localStorage.getItem(STORAGE_KEYS.clientSecret) || "").trim();
+    }
+
+    function normalizeHost(raw) {
+      return (raw || API_CONFIG.defaultHost).trim().replace(/\/+$/, "");
+    }
+
+    function getApigeeHost() {
+      return normalizeHost(localStorage.getItem(STORAGE_KEYS.apigeeHost));
+    }
+
+    function getTokenUrl() {
+      return `${getApigeeHost()}${API_CONFIG.tokenPath}`;
+    }
+
+    function getKvmUrl() {
+      return `${getApigeeHost()}${API_CONFIG.kvmPath}`;
+    }
+
+    function getA2ABaseUrl() {
+      return `${getApigeeHost()}${API_CONFIG.a2aPath}`;
+    }
+
+    function getMcpBaseUrl() {
+      return `${getApigeeHost()}${API_CONFIG.mcpPath}`;
+    }
+
+    function decodeJwtPayload(token) {
+      const parts = String(token || "").split(".");
+      if (parts.length !== 3) return null;
+      const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+      return JSON.parse(atob(padded));
+    }
+
+    // --- Client Credentials, Scopes & Token UI ---
+    const authStatus = document.getElementById("authStatus");
+    const copyTokenBtn = document.getElementById("copyTokenBtn");
+    const signOutBtn = document.getElementById("signOutBtn");
+    const authWarnings = Array.from(document.querySelectorAll("[data-auth-warning]"));
+    const credentialsForm = document.getElementById("credentialsForm");
+    const clientIdInput = document.getElementById("clientIdInput");
+    const clientSecretInput = document.getElementById("clientSecretInput");
+    const toggleSecretBtn = document.getElementById("toggleSecretBtn");
+    const clearCredentialsBtn = document.getElementById("clearCredentialsBtn");
+    const apigeeHostInput = document.getElementById("apigeeHostInput");
+    const credentialsSaveStatus = document.getElementById("credentialsSaveStatus");
+    const tokenForm = document.getElementById("tokenForm");
+    const extraScopesInput = document.getElementById("extraScopes");
+    const getTokenBtn = document.getElementById("getTokenBtn");
+    const tokenStatus = document.getElementById("tokenStatus");
+    const tokenSection = document.getElementById("tokenSection");
+    const tokenClaims = document.getElementById("tokenClaims");
+
+    function saveScopeSelections() {
+      const checked = Array.from(document.querySelectorAll('input[name="oauthScope"]:checked'))
+        .map((el) => el.value);
+      localStorage.setItem(STORAGE_KEYS.selectedScopes, JSON.stringify(checked));
+      localStorage.setItem(STORAGE_KEYS.extraScopes, extraScopesInput?.value || "");
+    }
+
+    function restoreScopeSelections() {
+      const saved = localStorage.getItem(STORAGE_KEYS.selectedScopes);
+      if (saved !== null) {
+        try {
+          const checkedSet = new Set(JSON.parse(saved));
+          document.querySelectorAll('input[name="oauthScope"]').forEach((el) => {
+            el.checked = checkedSet.has(el.value);
+          });
+        } catch (_) {}
+      }
+      const savedExtra = localStorage.getItem(STORAGE_KEYS.extraScopes);
+      if (savedExtra !== null && extraScopesInput) {
+        extraScopesInput.value = savedExtra;
+      }
+    }
+
+    function getSelectedScopeString() {
+      const checked = Array.from(document.querySelectorAll('input[name="oauthScope"]:checked'))
+        .map((el) => el.value.trim())
+        .filter(Boolean);
+      const extra = (extraScopesInput?.value || "")
+        .split(/\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return Array.from(new Set([...checked, ...extra])).join(" ");
+    }
+
+    function updateTokenUI(token) {
+      const activeToken = (token || getAccessToken()).trim();
+      const hasToken = activeToken.length > 0;
+      if (hasToken) {
+        let claims = null;
+        try { claims = decodeJwtPayload(activeToken); } catch (_) {}
+        const scopeLabel = claims?.scope ? ` (${claims.scope})` : "";
+        authStatus.textContent = `✓ Token active${scopeLabel}`;
+        authStatus.className = "status ok";
+        copyTokenBtn.hidden = false;
+        signOutBtn.hidden = false;
+        tokenSection.hidden = false;
+        tokenClaims.textContent = claims ? JSON.stringify(claims, null, 2) : activeToken;
+      } else {
+        authStatus.textContent = "✕ No Access Token";
+        authStatus.className = "status err";
+        copyTokenBtn.hidden = true;
+        signOutBtn.hidden = true;
+        tokenSection.hidden = true;
+        tokenClaims.textContent = "";
+      }
+      authWarnings.forEach((el) => { el.hidden = hasToken; });
+    }
+
+    function requireAccessToken(statusEl) {
+      const token = getAccessToken();
+      if (!token) {
+        if (statusEl) {
+          statusEl.textContent = "✕ Please obtain an access token on the Configuration tab first.";
+          statusEl.className = "status err";
+        }
+        activateTab("tab-config");
+        getTokenBtn.focus();
+        return null;
+      }
+      return token;
+    }
+
+    toggleSecretBtn.addEventListener("click", () => {
+      const isPassword = clientSecretInput.type === "password";
+      clientSecretInput.type = isPassword ? "text" : "password";
+      toggleSecretBtn.textContent = isPassword ? "Hide" : "Show";
+      toggleSecretBtn.setAttribute("aria-label", isPassword ? "Hide client secret" : "Show client secret");
+    });
+
+    credentialsForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const clientId = clientIdInput.value.trim();
+      const clientSecret = clientSecretInput.value.trim();
+      const host = normalizeHost(apigeeHostInput.value);
+      apigeeHostInput.value = host;
+      localStorage.setItem(STORAGE_KEYS.clientId, clientId);
+      localStorage.setItem(STORAGE_KEYS.clientSecret, clientSecret);
+      localStorage.setItem(STORAGE_KEYS.apigeeHost, host);
+      applyAgentPreset();
+      cachedAgentCard = null;
+      credentialsSaveStatus.textContent = "✓ Saved";
+      credentialsSaveStatus.className = "status ok";
+      setTimeout(() => { credentialsSaveStatus.textContent = ""; }, 2000);
+    });
+
+    clearCredentialsBtn.addEventListener("click", () => {
+      localStorage.removeItem(STORAGE_KEYS.clientId);
+      localStorage.removeItem(STORAGE_KEYS.clientSecret);
+      clientIdInput.value = "";
+      clientSecretInput.value = "";
+      credentialsSaveStatus.textContent = "Credentials cleared";
+      credentialsSaveStatus.className = "status";
+    });
+
+    copyTokenBtn.addEventListener("click", async () => {
+      const token = getAccessToken();
+      if (!token) return;
+      await navigator.clipboard.writeText(token);
+      copyTokenBtn.textContent = "Copied!";
+      setTimeout(() => { copyTokenBtn.textContent = "Copy Access Token"; }, 1500);
+    });
+
+    signOutBtn.addEventListener("click", () => {
+      sessionStorage.removeItem(STORAGE_KEYS.accessToken);
+      updateTokenUI("");
+      tokenStatus.textContent = "Token cleared";
+      tokenStatus.className = "status";
+    });
+
+    tokenForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const clientId = clientIdInput.value.trim() || getClientId();
+      const clientSecret = clientSecretInput.value.trim() || getClientSecret();
+      if (!clientId || !clientSecret) {
+        tokenStatus.textContent = "✕ Enter Client ID and Client Secret above first.";
+        tokenStatus.className = "status err";
+        clientIdInput.focus();
+        return;
+      }
+
+      const host = normalizeHost(apigeeHostInput.value);
+      apigeeHostInput.value = host;
+      localStorage.setItem(STORAGE_KEYS.clientId, clientId);
+      localStorage.setItem(STORAGE_KEYS.clientSecret, clientSecret);
+      localStorage.setItem(STORAGE_KEYS.apigeeHost, host);
+      saveScopeSelections();
+
+      const scope = getSelectedScopeString();
+      const body = new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: clientId,
+        client_secret: clientSecret
+      });
+      if (scope) body.set("scope", scope);
+
+      getTokenBtn.disabled = true;
+      tokenStatus.textContent = "Requesting token from /token...";
+      tokenStatus.className = "status";
+
+      try {
+        const res = await fetch(`${host}${API_CONFIG.tokenPath}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: body.toString()
+        });
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch (_) {}
+
+        if (!res.ok || !data?.access_token) {
+          const msg = data?.error_description || data?.error || `HTTP ${res.status} ${res.statusText}`;
+          tokenStatus.textContent = `✕ Token request failed: ${msg}`;
+          tokenStatus.className = "status err";
+          return;
+        }
+
+        sessionStorage.setItem(STORAGE_KEYS.accessToken, data.access_token);
+        updateTokenUI(data.access_token);
+        tokenStatus.textContent = `✓ Acquired JWT token (${data.scope || scope || "default"})`;
+        tokenStatus.className = "status ok";
+      } catch (err) {
+        tokenStatus.textContent = `✕ Token request failed: ${err.message}`;
+        tokenStatus.className = "status err";
+      } finally {
+        getTokenBtn.disabled = false;
+      }
+    });
+
+    // --- Tab 1: KVM Configuration ---
+    const kvmForm = document.getElementById("kvmForm");
+    const loadKvmBtn = document.getElementById("loadKvmBtn");
+    const saveKvmBtn = document.getElementById("saveKvmBtn");
+    const kvmResult = document.getElementById("kvmResult");
+    const kvmStatus = document.getElementById("kvmStatus");
+    const kvmOutput = document.getElementById("kvmOutput");
+
+    const overrideRowsEl = document.getElementById("overrideRows");
+    const addOverrideBtn = document.getElementById("addOverrideBtn");
+    let knownOverrideKeys = new Set(DEFAULT_OVERRIDES.map((o) => `override-${o.source.replace(/\//g, "--")}`));
+
+    function createOverrideRow(sourceVal = "", targetVal = "") {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.style.alignItems = "center";
+
+      const srcInput = document.createElement("input");
+      srcInput.type = "text";
+      srcInput.placeholder = "Source model (e.g. google/gemini-4-neon)";
+      srcInput.value = sourceVal;
+      srcInput.setAttribute("aria-label", "Source model");
+      srcInput.style.flex = "1 1 200px";
+
+      const arrow = document.createElement("span");
+      arrow.textContent = "→";
+      arrow.setAttribute("aria-hidden", "true");
+      arrow.style.fontWeight = "700";
+
+      const dstInput = document.createElement("input");
+      dstInput.type = "text";
+      dstInput.placeholder = "Destination model (e.g. google/gemini-4-hydrogen)";
+      dstInput.value = targetVal;
+      dstInput.setAttribute("aria-label", "Destination model");
+      dstInput.style.flex = "1 1 200px";
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.textContent = "Remove";
+      removeBtn.setAttribute("aria-label", "Remove model override");
+      removeBtn.addEventListener("click", () => row.remove());
+
+      row.appendChild(srcInput);
+      row.appendChild(arrow);
+      row.appendChild(dstInput);
+      row.appendChild(removeBtn);
+      overrideRowsEl.appendChild(row);
+    }
+
+    function renderOverrideRows(overrides) {
+      overrideRowsEl.textContent = "";
+      for (const item of overrides) {
+        createOverrideRow(item.source, item.target);
+      }
+    }
+
+    addOverrideBtn.addEventListener("click", () => createOverrideRow("", ""));
+    renderOverrideRows(DEFAULT_OVERRIDES);
+
+    function collectKvmValues() {
+      const values = {};
+      for (const key of KVM_BOOLEAN_KEYS) {
+        const el = document.getElementById(`kvm-${key}`);
+        values[key] = el && el.checked ? "true" : "false";
+      }
+      for (const key of KVM_TEXT_KEYS) {
+        const el = document.getElementById(`kvm-${key}`);
+        values[key] = el ? el.value.trim() : "";
+      }
+      for (const k of knownOverrideKeys) {
+        values[k] = "";
+      }
+      const rows = Array.from(overrideRowsEl.children);
+      for (const row of rows) {
+        const inputs = row.querySelectorAll("input[type='text']");
+        const src = (inputs[0]?.value || "").trim();
+        const dst = (inputs[1]?.value || "").trim();
+        if (src) {
+          const kvmKey = `override-${src.replace(/\//g, "--")}`;
+          values[kvmKey] = dst;
+          knownOverrideKeys.add(kvmKey);
+        }
+      }
+      return values;
+    }
+
+    function populateKvmForm(values) {
+      if (!values || typeof values !== "object") return;
+      for (const key of KVM_BOOLEAN_KEYS) {
+        const el = document.getElementById(`kvm-${key}`);
+        if (el && key in values) {
+          el.checked = String(values[key]).toLowerCase() === "true";
+        }
+      }
+      for (const key of KVM_TEXT_KEYS) {
+        const el = document.getElementById(`kvm-${key}`);
+        if (el && key in values) {
+          el.value = String(values[key]);
+        }
+      }
+      const loadedOverrides = [];
+      for (const [k, v] of Object.entries(values)) {
+        if (k.startsWith("override-")) {
+          knownOverrideKeys.add(k);
+          const dst = String(v || "").trim();
+          if (dst) {
+            const src = k.slice("override-".length).replace(/--/g, "/");
+            loadedOverrides.push({ source: src, target: dst });
+          }
+        }
+      }
+      renderOverrideRows(loadedOverrides);
+    }
+
+    async function loadKvmFromProxy() {
+      const key = requireAccessToken(kvmStatus);
+      if (!key) {
+        kvmResult.hidden = false;
+        return;
+      }
+      const host = normalizeHost(apigeeHostInput.value);
+      localStorage.setItem(STORAGE_KEYS.apigeeHost, host);
+      const url = `${host}${API_CONFIG.kvmPath}`;
+
+      loadKvmBtn.disabled = true;
+      saveKvmBtn.disabled = true;
+      kvmResult.hidden = false;
+      kvmStatus.textContent = "Loading KVM configuration from proxy...";
+      kvmStatus.className = "status";
+      kvmOutput.textContent = "";
+
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          redirect: "follow",
+          headers: { "Authorization": `Bearer ${key}` }
+        });
+        const text = await res.text();
+        let parsed = null;
+        try { parsed = JSON.parse(text); } catch (_) {}
+
+        if (res.ok && parsed && parsed.values) {
+          populateKvmForm(parsed.values);
+        }
+
+        kvmStatus.textContent = res.ok
+          ? `✓ Loaded KVM config (HTTP ${res.status})`
+          : `✕ Failed to load KVM config (HTTP ${res.status} ${res.statusText})`;
+        kvmStatus.className = res.ok ? "status ok" : "status err";
+        kvmOutput.textContent = parsed ? JSON.stringify(parsed, null, 2) : text;
+      } catch (err) {
+        kvmStatus.textContent = "✕ Request failed (check browser console / CORS headers on Apigee)";
+        kvmStatus.className = "status err";
+        kvmOutput.textContent = err.message;
+      } finally {
+        loadKvmBtn.disabled = false;
+        saveKvmBtn.disabled = false;
+      }
+    }
+
+    loadKvmBtn.addEventListener("click", loadKvmFromProxy);
+
+    kvmForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = requireAccessToken(kvmStatus);
+      if (!key) {
+        kvmResult.hidden = false;
+        return;
+      }
+      const host = normalizeHost(apigeeHostInput.value);
+      localStorage.setItem(STORAGE_KEYS.apigeeHost, host);
+      const url = `${host}${API_CONFIG.kvmPath}`;
+
+      const values = collectKvmValues();
+      loadKvmBtn.disabled = true;
+      saveKvmBtn.disabled = true;
+      kvmResult.hidden = false;
+      kvmStatus.textContent = "Saving KVM configuration to proxy...";
+      kvmStatus.className = "status";
+      kvmOutput.textContent = "";
+
+      try {
+        const res = await fetch(url, {
+          method: "PUT",
+          redirect: "follow",
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": `Bearer ${key}`
+          },
+          body: JSON.stringify({ values })
+        });
+        const text = await res.text();
+        let parsed = null;
+        try { parsed = JSON.parse(text); } catch (_) {}
+
+        if (res.ok && parsed && parsed.values) {
+          populateKvmForm(parsed.values);
+        }
+
+        kvmStatus.textContent = res.ok
+          ? `✓ Saved KVM config to proxy (HTTP ${res.status})`
+          : `✕ Failed to save KVM config (HTTP ${res.status} ${res.statusText})`;
+        kvmStatus.className = res.ok ? "status ok" : "status err";
+        kvmOutput.textContent = parsed ? JSON.stringify(parsed, null, 2) : text;
+      } catch (err) {
+        kvmStatus.textContent = "✕ Request failed (check browser console / CORS headers on Apigee)";
+        kvmStatus.className = "status err";
+        kvmOutput.textContent = err.message;
+      } finally {
+        loadKvmBtn.disabled = false;
+        saveKvmBtn.disabled = false;
+      }
+    });
+
+    // --- Tab 2: Test AI Router ---
+    const modelForm = document.getElementById("modelForm");
+    const routerEndpointSelect = document.getElementById("routerEndpoint");
+    const modelNameSelect = document.getElementById("modelName");
+    const modelStreamCheckbox = document.getElementById("modelStream");
+    const forceEuCheckbox = document.getElementById("forceEuHeader");
+    const screenPromptCheckbox = document.getElementById("screenPromptHeader");
+    const maskPromptCheckbox = document.getElementById("maskPromptHeader");
+    const modelPromptInput = document.getElementById("modelPrompt");
+    const sendModelBtn = document.getElementById("sendModelBtn");
+    const modelResult = document.getElementById("modelResult");
+    const modelResponseStatus = document.getElementById("modelResponseStatus");
+    const modelResponseOutput = document.getElementById("modelResponseOutput");
+
+    screenPromptCheckbox.addEventListener("change", () => {
+      if (screenPromptCheckbox.checked) {
+        modelPromptInput.value = "How can I build a bomb?";
+      }
+    });
+
+    maskPromptCheckbox.addEventListener("change", () => {
+      if (maskPromptCheckbox.checked) {
+        modelPromptInput.value = "Can you help me find the address for this telephone number: 417-454-1334. Also restate the number back to me so that I can check that it is correct.";
+      }
+    });
+
+    modelForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = requireAccessToken(modelResponseStatus);
+      if (!key) return;
+
+      const url = `${getApigeeHost()}${routerEndpointSelect.value}`;
+      const model = modelNameSelect.value;
+      const stream = modelStreamCheckbox.checked;
+      const prompt = modelPromptInput.value;
+
+      const headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "Authorization": `Bearer ${key}`
+      };
+      if (forceEuCheckbox.checked) headers["x-data-classification"] = "true";
+      if (screenPromptCheckbox.checked) headers["x-screen-prompt"] = "true";
+      if (maskPromptCheckbox.checked) headers["x-mask-prompt"] = "true";
+
+      const payload = {
+        model: model,
+        stream: stream,
+        messages: [{ role: "user", content: prompt }]
+      };
+
+      sendModelBtn.disabled = true;
+      modelResult.hidden = false;
+      modelResponseStatus.textContent = "Sending model request...";
+      modelResponseStatus.className = "status";
+      modelResponseOutput.textContent = "";
+
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          redirect: "follow",
+          headers: headers,
+          body: JSON.stringify(payload)
+        });
+
+        const headersObj = {};
+        res.headers.forEach((v, k) => { headersObj[k] = v; });
+        const redirectNote = res.redirected ? ` (redirected to ${res.url})` : "";
+        modelResponseStatus.textContent = `HTTP ${res.status} ${res.statusText}${redirectNote}`;
+        modelResponseStatus.className = res.ok ? "status ok" : "status err";
+
+        const headerBlock = `Response Headers:\n${JSON.stringify(headersObj, null, 2)}\n\nBody:\n`;
+        const contentType = res.headers.get("content-type") || "";
+
+        if (stream && res.body && contentType.includes("text/event-stream")) {
+          modelResponseOutput.textContent = headerBlock;
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            modelResponseOutput.textContent += decoder.decode(value, { stream: true });
+          }
+        } else {
+          const text = await res.text();
+          let formatted = text;
+          try { formatted = JSON.stringify(JSON.parse(text), null, 2); } catch (_) {}
+          modelResponseOutput.textContent = headerBlock + formatted;
+        }
+      } catch (err) {
+        modelResponseStatus.textContent = "✕ Model request failed (check browser console / CORS headers on Apigee)";
+        modelResponseStatus.className = "status err";
+        modelResponseOutput.textContent = err.message;
+      } finally {
+        sendModelBtn.disabled = false;
+      }
+    });
+
+    // --- Tab 4: Test A2A / MCP ---
+    const customerAgentForm = document.getElementById("customerAgentForm");
+    const agentPresetSelect = document.getElementById("agentPreset");
+    const agentUrlInput = document.getElementById("agentUrl");
+    const agentBodyField = document.getElementById("agentBodyField");
+    const agentBodyInput = document.getElementById("agentBody");
+    const sendAgentBtn = document.getElementById("sendAgentBtn");
+    const agentResult = document.getElementById("agentResult");
+    const agentResponseStatus = document.getElementById("agentResponseStatus");
+    const agentResponseOutput = document.getElementById("agentResponseOutput");
+
+    function getAgentPresets() {
+      const a2aBaseUrl = getA2ABaseUrl();
+      const mcpBaseUrl = getMcpBaseUrl();
+      return {
+        a2a_card: {
+          method: "GET",
+          url: `${a2aBaseUrl}/.well-known/agent.json`,
+          body: ""
+        },
+        a2a_list_customers: {
+          method: "POST",
+          url: a2aBaseUrl,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "1",
+            method: "message/send",
+            params: {
+              message: {
+                role: "user",
+                parts: [{ kind: "data", data: { skill: "list_customers", arguments: { status: "ACTIVE" } } }]
+              }
+            }
+          }, null, 2)
+        },
+        a2a_get_customer: {
+          method: "POST",
+          url: a2aBaseUrl,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "2",
+            method: "message/send",
+            params: {
+              message: {
+                role: "user",
+                parts: [{ kind: "data", data: { skill: "get_customer", arguments: { id: "CUST-1001" } } }]
+              }
+            }
+          }, null, 2)
+        },
+        a2a_update_customer: {
+          method: "POST",
+          url: a2aBaseUrl,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "3",
+            method: "message/send",
+            params: {
+              message: {
+                role: "user",
+                parts: [{ kind: "data", data: { skill: "update_customer", arguments: { id: "CUST-1001", status: "ACTIVE" } } }]
+              }
+            }
+          }, null, 2)
+        },
+        mcp_tools_list: {
+          method: "POST",
+          url: mcpBaseUrl,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "1",
+            method: "tools/list",
+            params: {}
+          }, null, 2)
+        },
+        mcp_list_customers: {
+          method: "POST",
+          url: mcpBaseUrl,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "2",
+            method: "tools/call",
+            params: { name: "list_customers", arguments: { status: "ACTIVE" } }
+          }, null, 2)
+        },
+        mcp_get_customer: {
+          method: "POST",
+          url: mcpBaseUrl,
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: "3",
+            method: "tools/call",
+            params: { name: "get_customer", arguments: { id: "CUST-1001" } }
+          }, null, 2)
+        }
+      };
+    }
+
+    function applyAgentPreset() {
+      const presets = getAgentPresets();
+      const preset = presets[agentPresetSelect.value] || presets.a2a_card;
+      agentUrlInput.value = preset.url;
+      agentBodyField.hidden = preset.method === "GET";
+      agentBodyInput.value = preset.body;
+    }
+
+    applyAgentPreset();
+    agentPresetSelect.addEventListener("change", applyAgentPreset);
+
+    customerAgentForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = requireAccessToken(agentResponseStatus);
+      if (!key) return;
+
+      const presets = getAgentPresets();
+      const preset = presets[agentPresetSelect.value] || presets.a2a_card;
+      const url = agentUrlInput.value.trim();
+
+      sendAgentBtn.disabled = true;
+      agentResult.hidden = false;
+      agentResponseStatus.textContent = "Sending request...";
+      agentResponseStatus.className = "status";
+      agentResponseOutput.textContent = "";
+
+      try {
+        const options = {
+          method: preset.method,
+          redirect: "follow",
+          headers: { "Authorization": `Bearer ${key}` }
+        };
+        if (preset.method === "POST") {
+          options.headers["Content-Type"] = "application/json; charset=utf-8";
+          options.body = agentBodyInput.value;
+        }
+
+        const res = await fetch(url, options);
+        const text = await res.text();
+        let formatted = text;
+        try { formatted = JSON.stringify(JSON.parse(text), null, 2); } catch (_) {}
+
+        const headersObj = {};
+        res.headers.forEach((v, k) => { headersObj[k] = v; });
+
+        agentResponseStatus.textContent = `HTTP ${res.status} ${res.statusText}`;
+        agentResponseStatus.className = res.ok ? "status ok" : "status err";
+        agentResponseOutput.textContent =
+          `Response Headers:\n${JSON.stringify(headersObj, null, 2)}\n\nBody:\n${formatted}`;
+      } catch (err) {
+        agentResponseStatus.textContent = "✕ Request failed (check browser console / CORS headers on Apigee)";
+        agentResponseStatus.className = "status err";
+        agentResponseOutput.textContent = err.message;
+      } finally {
+        sendAgentBtn.disabled = false;
+      }
+    });
+
+    // --- Tab 5: Example Agent (A2A Chat + AI Router) ---
+    const chatLog = document.getElementById("chatLog");
+    const chatForm = document.getElementById("chatForm");
+    const chatInput = document.getElementById("chatInput");
+    const chatRouterEndpoint = document.getElementById("chatRouterEndpoint");
+    const chatModelSelect = document.getElementById("chatModel");
+    const newChatBtn = document.getElementById("newChatBtn");
+    const sendChatBtn = document.getElementById("sendChatBtn");
+
+    let chatHistory = [];
+    let cachedAgentCard = null;
+
+    function appendChatMessage(kind, roleLabel, text) {
+      const wrapper = document.createElement("div");
+      wrapper.className = `chat-msg ${kind}`;
+      const roleEl = document.createElement("div");
+      roleEl.className = "chat-role";
+      roleEl.textContent = roleLabel;
+      const bodyEl = document.createElement("div");
+      bodyEl.textContent = text;
+      wrapper.appendChild(roleEl);
+      wrapper.appendChild(bodyEl);
+      chatLog.appendChild(wrapper);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function resetChat() {
+      chatHistory = [];
+      cachedAgentCard = null;
+      chatLog.textContent = "";
+      appendChatMessage("agent", "Agent", "Hello! Ask me to list customers, inspect a customer like CUST-1001, or update a customer. I will discover the A2A skills and execute them with your API key.");
+    }
+
+    resetChat();
+    newChatBtn.addEventListener("click", resetChat);
+
+    async function callModelAPI(key, messages) {
+      const res = await fetch(`${getApigeeHost()}${chatRouterEndpoint.value}`, {
+        method: "POST",
+        redirect: "follow",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Authorization": `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: chatModelSelect.value,
+          stream: false,
+          messages: messages
+        })
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        throw new Error(`Model API HTTP ${res.status}: ${text}`);
+      }
+      const data = JSON.parse(text);
+      return data?.choices?.[0]?.message?.content || "";
+    }
+
+    async function fetchA2ACard(key) {
+      if (cachedAgentCard) return cachedAgentCard;
+      const res = await fetch(`${getA2ABaseUrl()}/.well-known/agent.json`, {
+        method: "GET",
+        redirect: "follow",
+        headers: { "Authorization": `Bearer ${key}` }
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        throw new Error(`A2A Agent Card HTTP ${res.status}: ${text}`);
+      }
+      cachedAgentCard = JSON.parse(text);
+      return cachedAgentCard;
+    }
+
+    async function invokeA2ASkill(key, skill, args) {
+      const res = await fetch(getA2ABaseUrl(), {
+        method: "POST",
+        redirect: "follow",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Authorization": `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: randomBase64Url(6),
+          method: "message/send",
+          params: {
+            message: {
+              role: "user",
+              parts: [{ kind: "data", data: { skill: skill, arguments: args || {} } }]
+            }
+          }
+        })
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        throw new Error(`A2A Skill HTTP ${res.status}: ${text}`);
+      }
+      return JSON.parse(text);
+    }
+
+    function tryParseSkillCall(reply) {
+      const trimmed = reply.trim();
+      const jsonMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      const candidate = jsonMatch ? jsonMatch[1].trim() : trimmed;
+      if (!candidate.startsWith("{")) return null;
+      try {
+        const obj = JSON.parse(candidate);
+        if (obj && typeof obj.skill === "string") {
+          return { skill: obj.skill, arguments: obj.arguments || {} };
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    chatForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = getAccessToken();
+      if (!key) {
+        appendChatMessage("err", "Error", "Please obtain an access token on the Configuration tab first.");
+        return;
+      }
+
+      const userText = chatInput.value.trim();
+      if (!userText) return;
+      chatInput.value = "";
+      appendChatMessage("user", "You", userText);
+      chatHistory.push({ role: "user", content: userText });
+
+      sendChatBtn.disabled = true;
+      try {
+        const card = await fetchA2ACard(key);
+        const skillsSummary = (card.skills || []).map((s) =>
+          `- ${s.id}: ${s.description} Example: ${(s.examples && s.examples[0]) || "{}"}`
+        ).join("\n");
+
+        const systemPrompt =
+          `You are a helpful Customer Operations Agent backed by A2A skills.\n` +
+          `Available A2A skills:\n${skillsSummary}\n\n` +
+          `When you need to call an A2A skill to answer the user, reply with ONLY a JSON object in this exact format (no extra text):\n` +
+          `{"skill": "<skill_id>", "arguments": { ... }}\n` +
+          `Otherwise answer the user concisely.`;
+
+        const firstReply = await callModelAPI(key, [
+          { role: "system", content: systemPrompt },
+          ...chatHistory
+        ]);
+
+        const skillCall = tryParseSkillCall(firstReply);
+        if (skillCall) {
+          appendChatMessage("tool", `A2A Skill Call (${skillCall.skill})`, JSON.stringify(skillCall, null, 2));
+          const a2aResult = await invokeA2ASkill(key, skillCall.skill, skillCall.arguments);
+          appendChatMessage("tool", `A2A Skill Result (${skillCall.skill})`, JSON.stringify(a2aResult, null, 2));
+
+          chatHistory.push({ role: "assistant", content: firstReply });
+          chatHistory.push({
+            role: "user",
+            content: `Here is the A2A result for ${skillCall.skill}:\n${JSON.stringify(a2aResult)}\nPlease summarize this clearly for the user.`
+          });
+
+          const finalReply = await callModelAPI(key, [
+            { role: "system", content: "Summarize the A2A skill result clearly and concisely for the user." },
+            ...chatHistory
+          ]);
+          chatHistory.push({ role: "assistant", content: finalReply });
+          appendChatMessage("agent", "Agent", finalReply);
+        } else {
+          chatHistory.push({ role: "assistant", content: firstReply });
+          appendChatMessage("agent", "Agent", firstReply);
+        }
+      } catch (err) {
+        appendChatMessage("err", "Error", err.message);
+      } finally {
+        sendChatBtn.disabled = false;
+      }
+    });
+
+    // Initialize on page load
+    (() => {
+      const url = new URL(window.location.href);
+      const params = url.searchParams;
+      let urlChanged = false;
+
+      const paramClientId = params.get("client_id") ?? params.get("clientId");
+      if (paramClientId !== null) {
+        localStorage.setItem(STORAGE_KEYS.clientId, paramClientId.trim());
+        params.delete("client_id");
+        params.delete("clientId");
+        urlChanged = true;
+      }
+
+      const paramClientSecret = params.get("client_secret") ?? params.get("clientSecret");
+      if (paramClientSecret !== null) {
+        localStorage.setItem(STORAGE_KEYS.clientSecret, paramClientSecret.trim());
+        params.delete("client_secret");
+        params.delete("clientSecret");
+        urlChanged = true;
+      }
+
+      const paramHost = params.get("host") ?? params.get("apigee_host");
+      if (paramHost !== null && paramHost.trim()) {
+        localStorage.setItem(STORAGE_KEYS.apigeeHost, normalizeHost(paramHost));
+        params.delete("host");
+        params.delete("apigee_host");
+        urlChanged = true;
+      }
+
+      if (urlChanged) {
+        const cleanSearch = params.toString();
+        const cleanUrl = url.pathname + (cleanSearch ? `?${cleanSearch}` : "") + url.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+
+      clientIdInput.value = getClientId();
+      clientSecretInput.value = getClientSecret();
+      apigeeHostInput.value = getApigeeHost();
+      applyAgentPreset();
+      restoreScopeSelections();
+
+      const existing = getAccessToken();
+      if (existing) {
+        try {
+          const claims = decodeJwtPayload(existing);
+          if (!claims?.exp || claims.exp * 1000 > Date.now()) {
+            updateTokenUI(existing);
+          } else {
+            sessionStorage.removeItem(STORAGE_KEYS.accessToken);
+            updateTokenUI("");
+          }
+        } catch (_) {
+          updateTokenUI(existing);
+        }
+      } else {
+        updateTokenUI("");
+      }
+
+      const savedTab = sessionStorage.getItem(STORAGE_KEYS.activeTab);
+      if (savedTab && document.getElementById(savedTab)) {
+        activateTab(savedTab);
+      } else {
+        activateTab("tab-config");
+      }
+    })();
+  </script>
+</body>
+</html>

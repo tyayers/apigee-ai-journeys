@@ -2,6 +2,7 @@ import type { AppConfig } from "./config.ts";
 
 export interface PortalProvisionResult {
   apiKey: string;
+  apiSecret?: string | null;
   createdApp: boolean;
 }
 
@@ -42,6 +43,34 @@ function extractClientIdFromApp(app: unknown): string | null {
   }
   if (obj.data && typeof obj.data === "object") {
     return extractClientIdFromApp(obj.data);
+  }
+  return null;
+}
+
+function extractClientSecretFromApp(app: unknown): string | null {
+  if (!app || typeof app !== "object") return null;
+  const obj = app as Record<string, unknown>;
+
+  if (typeof obj.clientSecret === "string" && obj.clientSecret.trim()) {
+    return obj.clientSecret.trim();
+  }
+  if (typeof obj.consumerSecret === "string" && obj.consumerSecret.trim()) {
+    return obj.consumerSecret.trim();
+  }
+  if (Array.isArray(obj.credentials)) {
+    for (const cred of obj.credentials) {
+      if (cred && typeof cred === "object") {
+        const c = cred as Record<string, unknown>;
+        if (typeof c.clientSecret === "string" && c.clientSecret.trim()) return c.clientSecret.trim();
+        if (typeof c.consumerSecret === "string" && c.consumerSecret.trim()) return c.consumerSecret.trim();
+      }
+    }
+  }
+  if (obj.app && typeof obj.app === "object") {
+    return extractClientSecretFromApp(obj.app);
+  }
+  if (obj.data && typeof obj.data === "object") {
+    return extractClientSecretFromApp(obj.data);
   }
   return null;
 }
@@ -161,7 +190,12 @@ export async function ensurePortalCodingAgentKey(
     if (!existingKey) {
       throw new Error(`Existing app '${appName}' has no clientId/consumerKey`);
     }
-    return { apiKey: existingKey, createdApp: false };
+    const existingSecret = extractClientSecretFromApp(existingApp);
+    return {
+      apiKey: existingKey,
+      ...(existingSecret ? { apiSecret: existingSecret } : {}),
+      createdApp: false,
+    };
   }
 
   // 4. POST App (create {Name}-desktop-access subscribed to coding-agent-product)
@@ -182,7 +216,12 @@ export async function ensurePortalCodingAgentKey(
   if (!createdKey) {
     throw new Error(`Created app '${appName}' response missing clientId/consumerKey`);
   }
-  return { apiKey: createdKey, createdApp: true };
+  const createdSecret = extractClientSecretFromApp(createdPayload);
+  return {
+    apiKey: createdKey,
+    ...(createdSecret ? { apiSecret: createdSecret } : {}),
+    createdApp: true,
+  };
 }
 
 /**

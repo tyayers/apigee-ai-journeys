@@ -591,6 +591,10 @@ export class VmUserManager {
         if (portalResult?.apiKey) {
           portalEnv.ON_CONNECT_USER_ANTIGRAVITY_KEY = portalResult.apiKey;
           portalEnv.ON_CONNECT_USER_ANTHROPIC_API_KEY = portalResult.apiKey;
+          portalEnv.ON_CONNECT_USER_CLIENT_ID = portalResult.apiKey;
+          if (portalResult.apiSecret) {
+            portalEnv.ON_CONNECT_USER_CLIENT_SECRET = portalResult.apiSecret;
+          }
           console.log(
             `${new Date().toISOString()} [portal] ${portalResult.createdApp ? "Created" : "Found"} coding-agent-app key for '${options.email}'`
           );

@@ -1,0 +1,553 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/apigee/apigee-templater/main/schema/gateway.schema.1.0.json
+gateway: apigee
+schemaVersion: 1.0.0
+name: ai-kvm-config
+displayName: AI KVM Configuration Proxy
+type: proxy
+description: Reads and updates AI-Demo environment KVM configuration values
+categories:
+  - ai
+  - config
+endpoints:
+  - name: default
+    basePath: /aikvm/v1
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-DetectAuthType
+          - name: RF-MissingAuth
+            condition: flow.auth_type = "none"
+          - name: VA-VerifyKey
+            condition: flow.auth_type = "apikey"
+          - name: KVM-GetSecurityKeys
+            condition: flow.auth_type = "jwt"
+          - name: JWT-VerifyOIDCToken
+            condition: flow.auth_type = "jwt"
+          - name: JS-CheckAdminScope
+            condition: flow.auth_type = "jwt"
+          - name: RF-InsufficientAdminScope
+            condition: (flow.auth_type = "jwt") and (flow.has_valid_admin_scope != "true")
+          - name: KVM-GetAll
+            condition: (proxy.pathsuffix MatchesPath "/config") or (proxy.pathsuffix MatchesPath "") or (proxy.pathsuffix MatchesPath "/")
+          - name: JS-ParseKvmUpdate
+            condition: ((proxy.pathsuffix MatchesPath "/config") or (proxy.pathsuffix MatchesPath "") or (proxy.pathsuffix MatchesPath "/")) and ((request.verb = "PUT") or (request.verb = "POST"))
+          - name: RF-InvalidPayload
+            condition: flow.invalid_payload = "true"
+          - name: KVM-PutAll
+            condition: ((proxy.pathsuffix MatchesPath "/config") or (proxy.pathsuffix MatchesPath "") or (proxy.pathsuffix MatchesPath "/")) and ((request.verb = "PUT") or (request.verb = "POST")) and (flow.invalid_payload != "true")
+      - name: PostFlow
+        mode: Response
+        steps:
+          - name: JS-BuildGetResponse
+            condition: ((proxy.pathsuffix MatchesPath "/config") or (proxy.pathsuffix MatchesPath "") or (proxy.pathsuffix MatchesPath "/")) and (request.verb = "GET")
+          - name: JS-BuildUpdateResponse
+            condition: ((proxy.pathsuffix MatchesPath "/config") or (proxy.pathsuffix MatchesPath "") or (proxy.pathsuffix MatchesPath "/")) and ((request.verb = "PUT") or (request.verb = "POST"))
+policies:
+  - name: CORS-AllowAll
+    type: CORS
+    content:
+      CORS:
+        metadata:
+          name: CORS-AllowAll
+        AllowOrigins: "*"
+        AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        AllowHeaders: "*"
+        ExposeHeaders: "*"
+        MaxAge: "3600"
+        AllowCredentials: "false"
+        GeneratePreflightResponse: "true"
+  - name: EV-ExtractBearerKey
+    type: ExtractVariables
+    content:
+      ExtractVariables:
+        metadata:
+          name: EV-ExtractBearerKey
+        IgnoreUnresolvedVariables: "true"
+        Source: request
+        Header:
+          - metadata:
+              name: Authorization
+            Pattern:
+              metadata:
+                ignoreCase: "true"
+              value: "Bearer {flow.bearer_token}"
+  - name: JS-DetectAuthType
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-DetectAuthType
+          timeLimit: "200"
+        ResourceURL: jsc://detect-auth-type.js
+  - name: RF-MissingAuth
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-MissingAuth
+        FaultResponse:
+          Set:
+            StatusCode: 401
+            ReasonPhrase: Unauthorized
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"unauthorized","message":"Missing Authorization Bearer token or API key"}'
+  - name: VA-VerifyKey
+    type: VerifyAPIKey
+    content:
+      VerifyAPIKey:
+        metadata:
+          name: VA-VerifyKey
+        APIKey:
+          metadata:
+            ref: flow.api_key
+  - name: KVM-GetSecurityKeys
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetSecurityKeys
+          mapIdentifier: OIDC-Users
+        Scope: environment
+        Get:
+          - metadata:
+              assignTo: public.key
+            Key:
+              Parameter: "key:public_key"
+  - name: JWT-VerifyOIDCToken
+    type: VerifyJWT
+    content:
+      VerifyJWT:
+        metadata:
+          name: JWT-VerifyOIDCToken
+        Algorithm: RS256
+        IgnoreUnresolvedVariables: "false"
+        Source: flow.bearer_token
+        PublicKey:
+          Value:
+            metadata:
+              ref: public.key
+        Issuer:
+          metadata:
+            ref: flow.token_issuer
+        Audience:
+          metadata:
+            ref: flow.jwt_aud
+  - name: JS-CheckAdminScope
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-CheckAdminScope
+          timeLimit: "200"
+        ResourceURL: jsc://check-admin-scope.js
+  - name: RF-InsufficientAdminScope
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-InsufficientAdminScope
+        FaultResponse:
+          Set:
+            StatusCode: 403
+            ReasonPhrase: Forbidden
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"insufficient_scope","message":"Token missing customer-admin scope"}'
+  - name: KVM-GetAll
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetAll
+          mapIdentifier: AI-Demo
+        ExpiryTimeInSecs: "1"
+        Get:
+          - metadata:
+              assignTo: flow.kvm_throttle_europe_west3
+            Key:
+              Parameter: throttle-europe-west3
+          - metadata:
+              assignTo: flow.kvm_throttle_europe_west10
+            Key:
+              Parameter: throttle-europe-west10
+          - metadata:
+              assignTo: flow.kvm_throttle_us_east1
+            Key:
+              Parameter: throttle-us-east1
+          - metadata:
+              assignTo: flow.kvm_stop_europe_west3
+            Key:
+              Parameter: stop-europe-west3
+          - metadata:
+              assignTo: flow.kvm_stop_europe_west10
+            Key:
+              Parameter: stop-europe-west10
+          - metadata:
+              assignTo: flow.kvm_stop_us_east1
+            Key:
+              Parameter: stop-us-east1
+          - metadata:
+              assignTo: flow.kvm_stop_mcp
+            Key:
+              Parameter: stop-mcp
+          - metadata:
+              assignTo: flow.kvm_lite_model
+            Key:
+              Parameter: lite-model
+          - metadata:
+              assignTo: flow.kvm_medium_model
+            Key:
+              Parameter: medium-model
+          - metadata:
+              assignTo: flow.kvm_thinking_model
+            Key:
+              Parameter: thinking-model
+          - metadata:
+              assignTo: flow.kvm_lite_model_percent
+            Key:
+              Parameter: lite-model-percent
+          - metadata:
+              assignTo: flow.kvm_medium_model_percent
+            Key:
+              Parameter: medium-model-percent
+          - metadata:
+              assignTo: flow.kvm_thinking_model_percent
+            Key:
+              Parameter: thinking-model-percent
+          - metadata:
+              assignTo: flow.kvm_screen_prompt
+            Key:
+              Parameter: screen-prompt
+          - metadata:
+              assignTo: flow.kvm_mask_prompt
+            Key:
+              Parameter: mask-prompt
+          - metadata:
+              assignTo: flow.kvm_override_gemini_4_neon
+            Key:
+              Parameter: override-google--gemini-4-neon
+          - metadata:
+              assignTo: flow.kvm_override_gemini_4_carbon
+            Key:
+              Parameter: override-google--gemini-4-carbon
+  - name: KVM-PutAll
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-PutAll
+          mapIdentifier: AI-Demo
+        Put:
+          - Key:
+              Parameter: throttle-europe-west3
+            setValue:
+              - metadata:
+                  ref: flow.kvm_throttle_europe_west3
+          - Key:
+              Parameter: throttle-europe-west10
+            setValue:
+              - metadata:
+                  ref: flow.kvm_throttle_europe_west10
+          - Key:
+              Parameter: throttle-us-east1
+            setValue:
+              - metadata:
+                  ref: flow.kvm_throttle_us_east1
+          - Key:
+              Parameter: stop-europe-west3
+            setValue:
+              - metadata:
+                  ref: flow.kvm_stop_europe_west3
+          - Key:
+              Parameter: stop-europe-west10
+            setValue:
+              - metadata:
+                  ref: flow.kvm_stop_europe_west10
+          - Key:
+              Parameter: stop-us-east1
+            setValue:
+              - metadata:
+                  ref: flow.kvm_stop_us_east1
+          - Key:
+              Parameter: stop-mcp
+            setValue:
+              - metadata:
+                  ref: flow.kvm_stop_mcp
+          - Key:
+              Parameter: lite-model
+            setValue:
+              - metadata:
+                  ref: flow.kvm_lite_model
+          - Key:
+              Parameter: medium-model
+            setValue:
+              - metadata:
+                  ref: flow.kvm_medium_model
+          - Key:
+              Parameter: thinking-model
+            setValue:
+              - metadata:
+                  ref: flow.kvm_thinking_model
+          - Key:
+              Parameter: lite-model-percent
+            setValue:
+              - metadata:
+                  ref: flow.kvm_lite_model_percent
+          - Key:
+              Parameter: medium-model-percent
+            setValue:
+              - metadata:
+                  ref: flow.kvm_medium_model_percent
+          - Key:
+              Parameter: thinking-model-percent
+            setValue:
+              - metadata:
+                  ref: flow.kvm_thinking_model_percent
+          - Key:
+              Parameter: screen-prompt
+            setValue:
+              - metadata:
+                  ref: flow.kvm_screen_prompt
+          - Key:
+              Parameter: mask-prompt
+            setValue:
+              - metadata:
+                  ref: flow.kvm_mask_prompt
+          - Key:
+              Parameter: override-google--gemini-4-neon
+            setValue:
+              - metadata:
+                  ref: flow.kvm_override_gemini_4_neon
+          - Key:
+              Parameter: override-google--gemini-4-carbon
+            setValue:
+              - metadata:
+                  ref: flow.kvm_override_gemini_4_carbon
+  - name: RF-InvalidPayload
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-InvalidPayload
+        FaultResponse:
+          Set:
+            StatusCode: 400
+            ReasonPhrase: Bad Request
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"bad_request","message":"Request body must be a valid JSON object"}'
+  - name: JS-ParseKvmUpdate
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ParseKvmUpdate
+          timeLimit: "200"
+        ResourceURL: jsc://parse-kvm-update.js
+  - name: JS-BuildGetResponse
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-BuildGetResponse
+          timeLimit: "200"
+        ResourceURL: jsc://build-get-response.js
+  - name: JS-BuildUpdateResponse
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-BuildUpdateResponse
+          timeLimit: "200"
+        ResourceURL: jsc://build-update-response.js
+resources:
+  - name: detect-auth-type.js
+    type: jsc
+    content: |
+      var token = String(context.getVariable("flow.bearer_token") || "").trim();
+      if (!token) {
+        context.setVariable("flow.auth_type", "none");
+      } else {
+        var parts = token.split(".");
+        if (parts.length === 3) {
+          context.setVariable("flow.auth_type", "jwt");
+          var host = context.getVariable("request.header.host") || "";
+          var proto = context.getVariable("client.scheme") || "https";
+          context.setVariable("flow.token_issuer", proto + "://" + host);
+          var aud = "";
+          try {
+            var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            var b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+            var out = "";
+            for (var bc = 0, bs = 0, buffer, idx = 0; (buffer = b64.charAt(idx++)); ) {
+              var pos = chars.indexOf(buffer);
+              if (pos !== -1) {
+                bs = bc % 4 ? bs * 64 + pos : pos;
+                if (bc++ % 4) out += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+              }
+            }
+            var payload = JSON.parse(out);
+            if (Array.isArray(payload.aud)) {
+              aud = String(payload.aud[0] || "");
+            } else if (payload.aud) {
+              aud = String(payload.aud);
+            }
+          } catch (e) {}
+          context.setVariable("flow.jwt_aud", aud);
+        } else {
+          context.setVariable("flow.auth_type", "apikey");
+          context.setVariable("flow.api_key", token);
+        }
+      }
+  - name: check-admin-scope.js
+    type: jsc
+    content: |
+      var scopeRaw = String(context.getVariable("jwt.JWT-VerifyOIDCToken.claim.scope") || "");
+      var scopes = scopeRaw.split(/\s+/);
+      var hasAdmin = false;
+      for (var i = 0; i < scopes.length; i++) {
+        if (scopes[i] === "customer-admin") {
+          hasAdmin = true;
+          break;
+        }
+      }
+      context.setVariable("flow.has_valid_admin_scope", hasAdmin ? "true" : "false");
+  - name: parse-kvm-update.js
+    type: jsc
+    content: |
+      var KEY_MAP = [
+        { key: "throttle-europe-west3", varName: "flow.kvm_throttle_europe_west3" },
+        { key: "throttle-europe-west10", varName: "flow.kvm_throttle_europe_west10" },
+        { key: "throttle-us-east1", varName: "flow.kvm_throttle_us_east1" },
+        { key: "stop-europe-west3", varName: "flow.kvm_stop_europe_west3" },
+        { key: "stop-europe-west10", varName: "flow.kvm_stop_europe_west10" },
+        { key: "stop-us-east1", varName: "flow.kvm_stop_us_east1" },
+        { key: "stop-mcp", varName: "flow.kvm_stop_mcp" },
+        { key: "lite-model", varName: "flow.kvm_lite_model" },
+        { key: "medium-model", varName: "flow.kvm_medium_model" },
+        { key: "thinking-model", varName: "flow.kvm_thinking_model" },
+        { key: "lite-model-percent", varName: "flow.kvm_lite_model_percent" },
+        { key: "medium-model-percent", varName: "flow.kvm_medium_model_percent" },
+        { key: "thinking-model-percent", varName: "flow.kvm_thinking_model_percent" },
+        { key: "screen-prompt", varName: "flow.kvm_screen_prompt" },
+        { key: "mask-prompt", varName: "flow.kvm_mask_prompt" },
+        { key: "override-google--gemini-4-neon", varName: "flow.kvm_override_gemini_4_neon" },
+        { key: "override-google--gemini-4-carbon", varName: "flow.kvm_override_gemini_4_carbon" }
+      ];
+
+      context.setVariable("flow.invalid_payload", "false");
+      try {
+        var raw = context.getVariable("request.content");
+        var body = JSON.parse(raw);
+        if (!body || typeof body !== "object" || Array.isArray(body)) {
+          context.setVariable("flow.invalid_payload", "true");
+        } else {
+          var values = (body.values && typeof body.values === "object") ? body.values : body;
+          for (var i = 0; i < KEY_MAP.length; i++) {
+            var entry = KEY_MAP[i];
+            if (Object.prototype.hasOwnProperty.call(values, entry.key) && values[entry.key] !== undefined && values[entry.key] !== null) {
+              context.setVariable(entry.varName, String(values[entry.key]));
+            } else {
+              var existing = context.getVariable(entry.varName);
+              context.setVariable(entry.varName, existing !== undefined && existing !== null ? String(existing) : "");
+            }
+          }
+        }
+      } catch (e) {
+        context.setVariable("flow.invalid_payload", "true");
+      }
+  - name: build-get-response.js
+    type: jsc
+    content: |
+      var KEY_MAP = [
+        { key: "throttle-europe-west3", varName: "flow.kvm_throttle_europe_west3" },
+        { key: "throttle-europe-west10", varName: "flow.kvm_throttle_europe_west10" },
+        { key: "throttle-us-east1", varName: "flow.kvm_throttle_us_east1" },
+        { key: "stop-europe-west3", varName: "flow.kvm_stop_europe_west3" },
+        { key: "stop-europe-west10", varName: "flow.kvm_stop_europe_west10" },
+        { key: "stop-us-east1", varName: "flow.kvm_stop_us_east1" },
+        { key: "stop-mcp", varName: "flow.kvm_stop_mcp" },
+        { key: "lite-model", varName: "flow.kvm_lite_model" },
+        { key: "medium-model", varName: "flow.kvm_medium_model" },
+        { key: "thinking-model", varName: "flow.kvm_thinking_model" },
+        { key: "lite-model-percent", varName: "flow.kvm_lite_model_percent" },
+        { key: "medium-model-percent", varName: "flow.kvm_medium_model_percent" },
+        { key: "thinking-model-percent", varName: "flow.kvm_thinking_model_percent" },
+        { key: "screen-prompt", varName: "flow.kvm_screen_prompt" },
+        { key: "mask-prompt", varName: "flow.kvm_mask_prompt" },
+        { key: "override-google--gemini-4-neon", varName: "flow.kvm_override_gemini_4_neon" },
+        { key: "override-google--gemini-4-carbon", varName: "flow.kvm_override_gemini_4_carbon" }
+      ];
+
+      var values = {};
+      for (var i = 0; i < KEY_MAP.length; i++) {
+        var entry = KEY_MAP[i];
+        var val = context.getVariable(entry.varName);
+        values[entry.key] = (val !== undefined && val !== null) ? String(val) : "";
+      }
+
+      response.status.code = 200;
+      response.headers["Content-Type"] = "application/json";
+      response.content = JSON.stringify({
+        kvm: "AI-Demo",
+        values: values
+      });
+  - name: build-update-response.js
+    type: jsc
+    content: |
+      var KEY_MAP = [
+        { key: "throttle-europe-west3", varName: "flow.kvm_throttle_europe_west3" },
+        { key: "throttle-europe-west10", varName: "flow.kvm_throttle_europe_west10" },
+        { key: "throttle-us-east1", varName: "flow.kvm_throttle_us_east1" },
+        { key: "stop-europe-west3", varName: "flow.kvm_stop_europe_west3" },
+        { key: "stop-europe-west10", varName: "flow.kvm_stop_europe_west10" },
+        { key: "stop-us-east1", varName: "flow.kvm_stop_us_east1" },
+        { key: "stop-mcp", varName: "flow.kvm_stop_mcp" },
+        { key: "lite-model", varName: "flow.kvm_lite_model" },
+        { key: "medium-model", varName: "flow.kvm_medium_model" },
+        { key: "thinking-model", varName: "flow.kvm_thinking_model" },
+        { key: "lite-model-percent", varName: "flow.kvm_lite_model_percent" },
+        { key: "medium-model-percent", varName: "flow.kvm_medium_model_percent" },
+        { key: "thinking-model-percent", varName: "flow.kvm_thinking_model_percent" },
+        { key: "screen-prompt", varName: "flow.kvm_screen_prompt" },
+        { key: "mask-prompt", varName: "flow.kvm_mask_prompt" },
+        { key: "override-google--gemini-4-neon", varName: "flow.kvm_override_gemini_4_neon" },
+        { key: "override-google--gemini-4-carbon", varName: "flow.kvm_override_gemini_4_carbon" }
+      ];
+
+      var values = {};
+      for (var i = 0; i < KEY_MAP.length; i++) {
+        var entry = KEY_MAP[i];
+        var val = context.getVariable(entry.varName);
+        values[entry.key] = (val !== undefined && val !== null) ? String(val) : "";
+      }
+
+      response.status.code = 200;
+      response.headers["Content-Type"] = "application/json";
+      response.content = JSON.stringify({
+        status: "updated",
+        kvm: "AI-Demo",
+        values: values
+      });

@@ -2009,11 +2009,62 @@ if [[ -n "${PORTAL_HOST:-}" ]]; then
   } | write_user_file "$DESKTOP_DIR/apigee-portal.desktop" 0644 || true
 fi
 
+TESTER_BASE_URL="${ON_CONNECT_TESTER_URL:-https://apigee-ai-journeys.ai-gtw.net/tester.html}"
+TESTER_CLIENT_ID="${ON_CONNECT_USER_CLIENT_ID:-${ON_CONNECT_USER_ANTIGRAVITY_KEY:-}}"
+TESTER_CLIENT_SECRET="${ON_CONNECT_USER_CLIENT_SECRET:-}"
+TESTER_SHORTCUT_URL="$TESTER_BASE_URL"
+if [[ -n "$TESTER_CLIENT_ID" || -n "$TESTER_CLIENT_SECRET" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    TESTER_SHORTCUT_URL="$(TESTER_BASE="$TESTER_BASE_URL" CID="$TESTER_CLIENT_ID" CSEC="$TESTER_CLIENT_SECRET" python3 - <<'PY'
+import os, urllib.parse
+params = {}
+if os.environ.get("CID"):
+    params["client_id"] = os.environ["CID"]
+if os.environ.get("CSEC"):
+    params["client_secret"] = os.environ["CSEC"]
+q = urllib.parse.urlencode(params)
+base = os.environ["TESTER_BASE"]
+sep = "&" if "?" in base else "?"
+print(f"{base}{sep}{q}" if q else base)
+PY
+)"
+  else
+    TESTER_SEP="?"
+    [[ "$TESTER_BASE_URL" == *"?"* ]] && TESTER_SEP="&"
+    if [[ -n "$TESTER_CLIENT_ID" ]]; then
+      TESTER_SHORTCUT_URL="${TESTER_SHORTCUT_URL}${TESTER_SEP}client_id=${TESTER_CLIENT_ID}"
+      TESTER_SEP="&"
+    fi
+    if [[ -n "$TESTER_CLIENT_SECRET" ]]; then
+      TESTER_SHORTCUT_URL="${TESTER_SHORTCUT_URL}${TESTER_SEP}client_secret=${TESTER_CLIENT_SECRET}"
+    fi
+  fi
+fi
+
+{
+  printf '[Desktop Entry]\n'
+  printf 'Version=1.0\n'
+  printf 'Type=Link\n'
+  printf 'Name=Apigee AI Gateway Tester\n'
+  printf 'Comment=Open Apigee AI Gateway Tester\n'
+  printf 'Icon=google-chrome\n'
+  printf 'URL=%s\n' "$TESTER_SHORTCUT_URL"
+} | write_user_file "$DESKTOP_DIR/apigee-ai-gateway-tester.desktop" 0644 || true
+
+TESTER_BROWSER_AUTOSTART="$HOMEDIR/.config/autostart/apigee-tester-browser.desktop"
+{
+  printf '[Desktop Entry]\n'
+  printf 'Type=Application\n'
+  printf 'Name=Apigee AI Gateway Tester\n'
+  printf 'Exec=xdg-open "%s"\n' "$TESTER_SHORTCUT_URL"
+  printf 'X-GNOME-Autostart-enabled=true\n'
+} | write_user_file "$TESTER_BROWSER_AUTOSTART" 0644 || true
+
 # Remove any other stale .desktop shortcut names left in ~/Desktop from previous runs
 for existing_desk in "$DESKTOP_DIR"/*.desktop; do
   [[ ! -e "$existing_desk" ]] && continue
   case "$(basename -- "$existing_desk")" in
-    qterminal.desktop|google-chrome.desktop|codium.desktop|antigravity.desktop|claude.desktop|lxqt-config.desktop|apigee-portal.desktop) ;;
+    qterminal.desktop|google-chrome.desktop|codium.desktop|antigravity.desktop|claude.desktop|lxqt-config.desktop|apigee-portal.desktop|apigee-ai-gateway-tester.desktop) ;;
     *) rm -f -- "$existing_desk" ;;
   esac
 done
@@ -2335,13 +2386,21 @@ if [[ ! -e "$HOMEDIR/.config/google-chrome/First Run" ]]; then
   write_user_file "$HOMEDIR/.config/google-chrome/First Run" 0644 </dev/null || true
 fi
 
+STARTUP_URLS=()
 if [[ -n "${PORTAL_HOST:-}" && -n "${ON_CONNECT_PORTAL_USER_TOKEN:-}" ]]; then
-  PORTAL_AUTO_LOGIN_URL="${PORTAL_HOST%/}/portal#portal_token=${ON_CONNECT_PORTAL_USER_TOKEN}"
+  STARTUP_URLS+=("${PORTAL_HOST%/}/portal#portal_token=${ON_CONNECT_PORTAL_USER_TOKEN}")
+fi
+if [[ -n "${TESTER_SHORTCUT_URL:-}" ]]; then
+  STARTUP_URLS+=("${TESTER_SHORTCUT_URL}")
+fi
+
+if [[ "${#STARTUP_URLS[@]}" -gt 0 ]]; then
   ensure_user_dir "$HOMEDIR/.config/google-chrome/Default"
   CHROME_PREFS_FILE="$HOMEDIR/.config/google-chrome/Default/Preferences"
   CHROME_PREFS_TMP="$(mktemp "${TMPDIR:-/tmp}/chrome-prefs.XXXXXX")"
   if command -v python3 >/dev/null 2>&1; then
-    PREFS_PATH="$CHROME_PREFS_FILE" OUT_PATH="$CHROME_PREFS_TMP" PORTAL_URL="$PORTAL_AUTO_LOGIN_URL" python3 - <<'PY'
+    STARTUP_URLS_JSON="$(printf '%s\n' "${STARTUP_URLS[@]}" | python3 -c 'import json, sys; print(json.dumps([l.rstrip("\n") for l in sys.stdin if l.strip()]))')"
+    PREFS_PATH="$CHROME_PREFS_FILE" OUT_PATH="$CHROME_PREFS_TMP" STARTUP_URLS_JSON="$STARTUP_URLS_JSON" python3 - <<'PY'
 import json, os
 
 target = os.environ["PREFS_PATH"]
@@ -2359,7 +2418,7 @@ session = data.get("session")
 if not isinstance(session, dict):
     session = {}
 session["restore_on_startup"] = 4
-session["startup_urls"] = [os.environ["PORTAL_URL"]]
+session["startup_urls"] = json.loads(os.environ["STARTUP_URLS_JSON"])
 data["session"] = session
 
 with open(os.environ["OUT_PATH"], "w", encoding="utf-8") as f:
@@ -2368,7 +2427,7 @@ with open(os.environ["OUT_PATH"], "w", encoding="utf-8") as f:
 PY
   else
     printf '{\n  "session": {\n    "restore_on_startup": 4,\n    "startup_urls": ["%s"]\n  }\n}\n' \
-      "$(json_escape_string "$PORTAL_AUTO_LOGIN_URL")" >"$CHROME_PREFS_TMP"
+      "$(json_escape_string "${STARTUP_URLS[0]}")" >"$CHROME_PREFS_TMP"
   fi
   write_user_file "$CHROME_PREFS_FILE" 0600 <"$CHROME_PREFS_TMP" || true
   rm -f -- "$CHROME_PREFS_TMP"

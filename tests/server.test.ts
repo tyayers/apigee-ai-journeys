@@ -1523,10 +1523,27 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           "utf8"
         )
       );
+      const expectedTesterUrl = `https://apigee-ai-journeys.ai-gtw.net/tester.html?client_id=${encodeURIComponent(existingRes!.apiKey)}`;
       expect(chromePrefs.session).toEqual({
         restore_on_startup: 4,
-        startup_urls: [`${portalCfg.portalHost}/portal#portal_token=mock-id-token-for-jane.doe@example.com`],
+        startup_urls: [
+          `${portalCfg.portalHost}/portal#portal_token=mock-id-token-for-jane.doe@example.com`,
+          expectedTesterUrl,
+        ],
       });
+
+      const testerDesktop = await fs.readFile(
+        path.join(userHome, "Desktop", "apigee-ai-gateway-tester.desktop"),
+        "utf8"
+      );
+      expect(testerDesktop).toContain("Name=Apigee AI Gateway Tester");
+      expect(testerDesktop).toContain(`URL=${expectedTesterUrl}`);
+
+      const testerAutostart = await fs.readFile(
+        path.join(userHome, ".config", "autostart", "apigee-tester-browser.desktop"),
+        "utf8"
+      );
+      expect(testerAutostart).toContain(`Exec=xdg-open "${expectedTesterUrl}"`);
 
       const mimeapps = await fs.readFile(path.join(userHome, ".config", "mimeapps.list"), "utf8");
       expect(mimeapps).toContain("x-scheme-handler/http=apigee-chrome.desktop");

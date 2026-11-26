@@ -1,0 +1,2372 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/apigee/apigee-templater/main/schema/gateway.schema.1.0.json
+gateway: apigee
+schemaVersion: 1.0.0
+name: ai-platform-router
+displayName: AI Platform Health-Aware Router Proxy
+type: proxy
+description: Routes global, europe-west3, and europe-west10 endpoints to healthy regional targets with 2-minute cache failover and 307 redirects on fault
+categories:
+  - ai
+  - routing
+  - failover
+endpoints:
+  - name: global
+    basePath: /airouter/global/v1
+    routes:
+      - name: route-west3
+        target: europe-west3
+        condition: flow.selected_region = "europe-west3"
+      - name: route-west10
+        target: europe-west10
+        condition: flow.selected_region = "europe-west10"
+      - name: route-east1
+        target: us-east1
+        condition: flow.selected_region = "us-east1"
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-DetectAuthType
+          - name: RF-MissingAuth
+            condition: flow.auth_type = "none"
+          - name: VA-VerifyKey
+            condition: flow.auth_type = "apikey"
+          - name: JS-ExtractModelName
+            condition: flow.auth_type = "apikey"
+          - name: JS-ValidateQuotaModel
+            condition: (flow.auth_type = "apikey") and (ai.model != null)
+          - name: RF-ModelNotAllowed
+            condition: (flow.auth_type = "apikey") and (flow.model_not_allowed = "true")
+          - name: LTQ-QuotaEnforce
+            condition: (flow.auth_type = "apikey") and (ai.modelTokenLimit != null)
+          - name: JS-PrepareDownstreamFromApiKey
+            condition: flow.auth_type = "apikey"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+            condition: flow.auth_type = "jwt"
+          - name: JS-CheckModelScopeAndPrepareDownstream
+            condition: flow.auth_type = "jwt"
+          - name: RF-InsufficientModelScope
+            condition: (flow.auth_type = "jwt") and (flow.has_valid_model_scope != "true")
+          - name: JWT-GenerateDownstreamToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: AM-SetDownstreamBearerToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: LC-West3Health
+          - name: LC-West10Health
+          - name: LC-East1Health
+          - name: JS-SelectRegion
+          - name: RF-USNotAllowed
+            condition: flow.us_not_allowed = "true"
+          - name: RF-AllRegionsUnavailable
+            condition: flow.all_regions_unhealthy = "true"
+          - name: KVM-GetAIFlags
+          - name: JS-ParsePromptPayload
+          - name: JS-PrepareDLPRequest
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallDLP
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplyMaskedPrompt
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareModelArmorRequest
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallModelArmor
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-CheckModelArmorResponse
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: RF-PromptBlocked
+            condition: flow.prompt_blocked = "true"
+          - name: LC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareSmartRouterRequest
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: SC-CallGeminiSmartRouter
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplySmartModel
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: PC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: KVM-GetModelOverride
+            condition: flow.has_model = "true"
+          - name: JS-ApplyModelOverride
+            condition: (flow.has_model = "true") and (flow.override_model != null)
+      - name: PostFlow
+        mode: Response
+        steps:
+          - name: AM-SetRegionUsedHeader
+            condition: flow.selected_region != null
+          - name: AM-SetSmartResultHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartOverrideHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartLiteHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartMediumHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartThinkingHeader
+            condition: flow.is_smart_model = "true"
+          - name: JS-Analytics
+            condition: response.content != ""
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+    defaultFaultRule:
+      name: DefaultFaultRule
+      alwaysEnforce: "true"
+      steps:
+        - name: JS-RecordRegionFailure
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: PC-MarkRegionUnhealthy
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-Redirect307
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: RF-AllRegionsUnavailable
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy = "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-QuotaExhaustion
+          condition: fault.name = "LLMTokenQuotaViolation"
+        - name: AM-UnauthorizedModel
+          condition: (flow.selected_region != null) and ((response.status.code = 401) or (error.status.code = 401))
+  - name: eu
+    basePath: /airouter/eu/v1
+    routes:
+      - name: route-west3
+        target: europe-west3
+        condition: flow.selected_region = "europe-west3"
+      - name: route-west10
+        target: europe-west10
+        condition: flow.selected_region = "europe-west10"
+      - name: route-east1
+        target: us-east1
+        condition: flow.selected_region = "us-east1"
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-DetectAuthType
+          - name: RF-MissingAuth
+            condition: flow.auth_type = "none"
+          - name: VA-VerifyKey
+            condition: flow.auth_type = "apikey"
+          - name: JS-ExtractModelName
+            condition: flow.auth_type = "apikey"
+          - name: JS-ValidateQuotaModel
+            condition: (flow.auth_type = "apikey") and (ai.model != null)
+          - name: RF-ModelNotAllowed
+            condition: (flow.auth_type = "apikey") and (flow.model_not_allowed = "true")
+          - name: LTQ-QuotaEnforce
+            condition: (flow.auth_type = "apikey") and (ai.modelTokenLimit != null)
+          - name: JS-PrepareDownstreamFromApiKey
+            condition: flow.auth_type = "apikey"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+            condition: flow.auth_type = "jwt"
+          - name: JS-CheckModelScopeAndPrepareDownstream
+            condition: flow.auth_type = "jwt"
+          - name: RF-InsufficientModelScope
+            condition: (flow.auth_type = "jwt") and (flow.has_valid_model_scope != "true")
+          - name: JWT-GenerateDownstreamToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: AM-SetDownstreamBearerToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: LC-West3Health
+          - name: LC-West10Health
+          - name: LC-East1Health
+          - name: JS-SelectRegion
+          - name: RF-USNotAllowed
+            condition: flow.us_not_allowed = "true"
+          - name: RF-AllRegionsUnavailable
+            condition: flow.all_regions_unhealthy = "true"
+          - name: KVM-GetAIFlags
+          - name: JS-ParsePromptPayload
+          - name: JS-PrepareDLPRequest
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallDLP
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplyMaskedPrompt
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareModelArmorRequest
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallModelArmor
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-CheckModelArmorResponse
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: RF-PromptBlocked
+            condition: flow.prompt_blocked = "true"
+          - name: LC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareSmartRouterRequest
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: SC-CallGeminiSmartRouter
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplySmartModel
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: PC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: KVM-GetModelOverride
+            condition: flow.has_model = "true"
+          - name: JS-ApplyModelOverride
+            condition: (flow.has_model = "true") and (flow.override_model != null)
+      - name: PostFlow
+        mode: Response
+        steps:
+          - name: AM-SetRegionUsedHeader
+            condition: flow.selected_region != null
+          - name: AM-SetSmartResultHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartOverrideHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartLiteHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartMediumHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartThinkingHeader
+            condition: flow.is_smart_model = "true"
+          - name: JS-Analytics
+            condition: response.content != ""
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+    defaultFaultRule:
+      name: DefaultFaultRule
+      alwaysEnforce: "true"
+      steps:
+        - name: JS-RecordRegionFailure
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: PC-MarkRegionUnhealthy
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-Redirect307
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: RF-AllRegionsUnavailable
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy = "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-QuotaExhaustion
+          condition: fault.name = "LLMTokenQuotaViolation"
+        - name: AM-UnauthorizedModel
+          condition: (flow.selected_region != null) and ((response.status.code = 401) or (error.status.code = 401))
+  - name: us
+    basePath: /airouter/us/v1
+    routes:
+      - name: route-west3
+        target: europe-west3
+        condition: flow.selected_region = "europe-west3"
+      - name: route-west10
+        target: europe-west10
+        condition: flow.selected_region = "europe-west10"
+      - name: route-east1
+        target: us-east1
+        condition: flow.selected_region = "us-east1"
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-DetectAuthType
+          - name: RF-MissingAuth
+            condition: flow.auth_type = "none"
+          - name: VA-VerifyKey
+            condition: flow.auth_type = "apikey"
+          - name: JS-ExtractModelName
+            condition: flow.auth_type = "apikey"
+          - name: JS-ValidateQuotaModel
+            condition: (flow.auth_type = "apikey") and (ai.model != null)
+          - name: RF-ModelNotAllowed
+            condition: (flow.auth_type = "apikey") and (flow.model_not_allowed = "true")
+          - name: LTQ-QuotaEnforce
+            condition: (flow.auth_type = "apikey") and (ai.modelTokenLimit != null)
+          - name: JS-PrepareDownstreamFromApiKey
+            condition: flow.auth_type = "apikey"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+            condition: flow.auth_type = "jwt"
+          - name: JS-CheckModelScopeAndPrepareDownstream
+            condition: flow.auth_type = "jwt"
+          - name: RF-InsufficientModelScope
+            condition: (flow.auth_type = "jwt") and (flow.has_valid_model_scope != "true")
+          - name: JWT-GenerateDownstreamToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: AM-SetDownstreamBearerToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: LC-West3Health
+          - name: LC-West10Health
+          - name: LC-East1Health
+          - name: JS-SelectRegion
+          - name: RF-USNotAllowed
+            condition: flow.us_not_allowed = "true"
+          - name: RF-AllRegionsUnavailable
+            condition: flow.all_regions_unhealthy = "true"
+          - name: KVM-GetAIFlags
+          - name: JS-ParsePromptPayload
+          - name: JS-PrepareDLPRequest
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallDLP
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplyMaskedPrompt
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareModelArmorRequest
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallModelArmor
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-CheckModelArmorResponse
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: RF-PromptBlocked
+            condition: flow.prompt_blocked = "true"
+          - name: LC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareSmartRouterRequest
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: SC-CallGeminiSmartRouter
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplySmartModel
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: PC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: KVM-GetModelOverride
+            condition: flow.has_model = "true"
+          - name: JS-ApplyModelOverride
+            condition: (flow.has_model = "true") and (flow.override_model != null)
+      - name: PostFlow
+        mode: Response
+        steps:
+          - name: AM-SetRegionUsedHeader
+            condition: flow.selected_region != null
+          - name: AM-SetSmartResultHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartOverrideHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartLiteHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartMediumHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartThinkingHeader
+            condition: flow.is_smart_model = "true"
+          - name: JS-Analytics
+            condition: response.content != ""
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+    defaultFaultRule:
+      name: DefaultFaultRule
+      alwaysEnforce: "true"
+      steps:
+        - name: JS-RecordRegionFailure
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: PC-MarkRegionUnhealthy
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-Redirect307
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: RF-AllRegionsUnavailable
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy = "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-QuotaExhaustion
+          condition: fault.name = "LLMTokenQuotaViolation"
+        - name: AM-UnauthorizedModel
+          condition: (flow.selected_region != null) and ((response.status.code = 401) or (error.status.code = 401))
+  - name: europe-west3
+    basePath: /airouter/europe-west3/v1
+    routes:
+      - name: route-west3
+        target: europe-west3
+        condition: flow.selected_region = "europe-west3"
+      - name: route-west10
+        target: europe-west10
+        condition: flow.selected_region = "europe-west10"
+      - name: route-east1
+        target: us-east1
+        condition: flow.selected_region = "us-east1"
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-DetectAuthType
+          - name: RF-MissingAuth
+            condition: flow.auth_type = "none"
+          - name: VA-VerifyKey
+            condition: flow.auth_type = "apikey"
+          - name: JS-ExtractModelName
+            condition: flow.auth_type = "apikey"
+          - name: JS-ValidateQuotaModel
+            condition: (flow.auth_type = "apikey") and (ai.model != null)
+          - name: RF-ModelNotAllowed
+            condition: (flow.auth_type = "apikey") and (flow.model_not_allowed = "true")
+          - name: LTQ-QuotaEnforce
+            condition: (flow.auth_type = "apikey") and (ai.modelTokenLimit != null)
+          - name: JS-PrepareDownstreamFromApiKey
+            condition: flow.auth_type = "apikey"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+            condition: flow.auth_type = "jwt"
+          - name: JS-CheckModelScopeAndPrepareDownstream
+            condition: flow.auth_type = "jwt"
+          - name: RF-InsufficientModelScope
+            condition: (flow.auth_type = "jwt") and (flow.has_valid_model_scope != "true")
+          - name: JWT-GenerateDownstreamToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: AM-SetDownstreamBearerToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: LC-West3Health
+          - name: LC-West10Health
+          - name: LC-East1Health
+          - name: JS-SelectRegion
+          - name: RF-USNotAllowed
+            condition: flow.us_not_allowed = "true"
+          - name: RF-AllRegionsUnavailable
+            condition: flow.all_regions_unhealthy = "true"
+          - name: KVM-GetAIFlags
+          - name: JS-ParsePromptPayload
+          - name: JS-PrepareDLPRequest
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallDLP
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplyMaskedPrompt
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareModelArmorRequest
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallModelArmor
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-CheckModelArmorResponse
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: RF-PromptBlocked
+            condition: flow.prompt_blocked = "true"
+          - name: LC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareSmartRouterRequest
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: SC-CallGeminiSmartRouter
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplySmartModel
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: PC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: KVM-GetModelOverride
+            condition: flow.has_model = "true"
+          - name: JS-ApplyModelOverride
+            condition: (flow.has_model = "true") and (flow.override_model != null)
+      - name: PostFlow
+        mode: Response
+        steps:
+          - name: AM-SetRegionUsedHeader
+            condition: flow.selected_region != null
+          - name: AM-SetSmartResultHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartOverrideHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartLiteHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartMediumHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartThinkingHeader
+            condition: flow.is_smart_model = "true"
+          - name: JS-Analytics
+            condition: response.content != ""
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+    defaultFaultRule:
+      name: DefaultFaultRule
+      alwaysEnforce: "true"
+      steps:
+        - name: JS-RecordRegionFailure
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: PC-MarkRegionUnhealthy
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-Redirect307
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: RF-AllRegionsUnavailable
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy = "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-QuotaExhaustion
+          condition: fault.name = "LLMTokenQuotaViolation"
+        - name: AM-UnauthorizedModel
+          condition: (flow.selected_region != null) and ((response.status.code = 401) or (error.status.code = 401))
+  - name: europe-west10
+    basePath: /airouter/europe-west10/v1
+    routes:
+      - name: route-west3
+        target: europe-west3
+        condition: flow.selected_region = "europe-west3"
+      - name: route-west10
+        target: europe-west10
+        condition: flow.selected_region = "europe-west10"
+      - name: route-east1
+        target: us-east1
+        condition: flow.selected_region = "us-east1"
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-DetectAuthType
+          - name: RF-MissingAuth
+            condition: flow.auth_type = "none"
+          - name: VA-VerifyKey
+            condition: flow.auth_type = "apikey"
+          - name: JS-ExtractModelName
+            condition: flow.auth_type = "apikey"
+          - name: JS-ValidateQuotaModel
+            condition: (flow.auth_type = "apikey") and (ai.model != null)
+          - name: RF-ModelNotAllowed
+            condition: (flow.auth_type = "apikey") and (flow.model_not_allowed = "true")
+          - name: LTQ-QuotaEnforce
+            condition: (flow.auth_type = "apikey") and (ai.modelTokenLimit != null)
+          - name: JS-PrepareDownstreamFromApiKey
+            condition: flow.auth_type = "apikey"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+            condition: flow.auth_type = "jwt"
+          - name: JS-CheckModelScopeAndPrepareDownstream
+            condition: flow.auth_type = "jwt"
+          - name: RF-InsufficientModelScope
+            condition: (flow.auth_type = "jwt") and (flow.has_valid_model_scope != "true")
+          - name: JWT-GenerateDownstreamToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: AM-SetDownstreamBearerToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: LC-West3Health
+          - name: LC-West10Health
+          - name: LC-East1Health
+          - name: JS-SelectRegion
+          - name: RF-USNotAllowed
+            condition: flow.us_not_allowed = "true"
+          - name: RF-AllRegionsUnavailable
+            condition: flow.all_regions_unhealthy = "true"
+          - name: KVM-GetAIFlags
+          - name: JS-ParsePromptPayload
+          - name: JS-PrepareDLPRequest
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallDLP
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplyMaskedPrompt
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareModelArmorRequest
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallModelArmor
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-CheckModelArmorResponse
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: RF-PromptBlocked
+            condition: flow.prompt_blocked = "true"
+          - name: LC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareSmartRouterRequest
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: SC-CallGeminiSmartRouter
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplySmartModel
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: PC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: KVM-GetModelOverride
+            condition: flow.has_model = "true"
+          - name: JS-ApplyModelOverride
+            condition: (flow.has_model = "true") and (flow.override_model != null)
+      - name: PostFlow
+        mode: Response
+        steps:
+          - name: AM-SetRegionUsedHeader
+            condition: flow.selected_region != null
+          - name: AM-SetSmartResultHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartOverrideHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartLiteHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartMediumHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartThinkingHeader
+            condition: flow.is_smart_model = "true"
+          - name: JS-Analytics
+            condition: response.content != ""
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+    defaultFaultRule:
+      name: DefaultFaultRule
+      alwaysEnforce: "true"
+      steps:
+        - name: JS-RecordRegionFailure
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: PC-MarkRegionUnhealthy
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-Redirect307
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: RF-AllRegionsUnavailable
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy = "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-QuotaExhaustion
+          condition: fault.name = "LLMTokenQuotaViolation"
+        - name: AM-UnauthorizedModel
+          condition: (flow.selected_region != null) and ((response.status.code = 401) or (error.status.code = 401))
+  - name: us-east1
+    basePath: /airouter/us-east1/v1
+    routes:
+      - name: route-west3
+        target: europe-west3
+        condition: flow.selected_region = "europe-west3"
+      - name: route-west10
+        target: europe-west10
+        condition: flow.selected_region = "europe-west10"
+      - name: route-east1
+        target: us-east1
+        condition: flow.selected_region = "us-east1"
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-DetectAuthType
+          - name: RF-MissingAuth
+            condition: flow.auth_type = "none"
+          - name: VA-VerifyKey
+            condition: flow.auth_type = "apikey"
+          - name: JS-ExtractModelName
+            condition: flow.auth_type = "apikey"
+          - name: JS-ValidateQuotaModel
+            condition: (flow.auth_type = "apikey") and (ai.model != null)
+          - name: RF-ModelNotAllowed
+            condition: (flow.auth_type = "apikey") and (flow.model_not_allowed = "true")
+          - name: LTQ-QuotaEnforce
+            condition: (flow.auth_type = "apikey") and (ai.modelTokenLimit != null)
+          - name: JS-PrepareDownstreamFromApiKey
+            condition: flow.auth_type = "apikey"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+            condition: flow.auth_type = "jwt"
+          - name: JS-CheckModelScopeAndPrepareDownstream
+            condition: flow.auth_type = "jwt"
+          - name: RF-InsufficientModelScope
+            condition: (flow.auth_type = "jwt") and (flow.has_valid_model_scope != "true")
+          - name: JWT-GenerateDownstreamToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: AM-SetDownstreamBearerToken
+            condition: (flow.auth_type = "apikey") or ((flow.auth_type = "jwt") and (flow.has_valid_model_scope = "true"))
+          - name: LC-West3Health
+          - name: LC-West10Health
+          - name: LC-East1Health
+          - name: JS-SelectRegion
+          - name: RF-USNotAllowed
+            condition: flow.us_not_allowed = "true"
+          - name: RF-AllRegionsUnavailable
+            condition: flow.all_regions_unhealthy = "true"
+          - name: KVM-GetAIFlags
+          - name: JS-ParsePromptPayload
+          - name: JS-PrepareDLPRequest
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallDLP
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplyMaskedPrompt
+            condition: (flow.mask_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareModelArmorRequest
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: SC-CallModelArmor
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: JS-CheckModelArmorResponse
+            condition: (flow.screen_prompt = "true") and (flow.has_prompt = "true")
+          - name: RF-PromptBlocked
+            condition: flow.prompt_blocked = "true"
+          - name: LC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-PrepareSmartRouterRequest
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: SC-CallGeminiSmartRouter
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: JS-ApplySmartModel
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: PC-SmartCounts
+            condition: (flow.is_smart_model = "true") and (flow.has_prompt = "true")
+          - name: KVM-GetModelOverride
+            condition: flow.has_model = "true"
+          - name: JS-ApplyModelOverride
+            condition: (flow.has_model = "true") and (flow.override_model != null)
+      - name: PostFlow
+        mode: Response
+        steps:
+          - name: AM-SetRegionUsedHeader
+            condition: flow.selected_region != null
+          - name: AM-SetSmartResultHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartOverrideHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartLiteHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartMediumHeader
+            condition: flow.is_smart_model = "true"
+          - name: AM-SetSmartThinkingHeader
+            condition: flow.is_smart_model = "true"
+          - name: JS-Analytics
+            condition: response.content != ""
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+    defaultFaultRule:
+      name: DefaultFaultRule
+      alwaysEnforce: "true"
+      steps:
+        - name: JS-RecordRegionFailure
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: PC-MarkRegionUnhealthy
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-Redirect307
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy != "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: RF-AllRegionsUnavailable
+          condition: (flow.prompt_blocked != "true") and (flow.short_circuit_503 != "true") and (flow.all_regions_unhealthy = "true") and (flow.skip_failover != "true") and (flow.selected_region != null) and (response.status.code != 401) and (error.status.code != 401) and (response.status.code != 403) and (error.status.code != 403) and (fault.name != "LLMTokenQuotaViolation")
+        - name: AM-QuotaExhaustion
+          condition: fault.name = "LLMTokenQuotaViolation"
+        - name: AM-UnauthorizedModel
+          condition: (flow.selected_region != null) and ((response.status.code = 401) or (error.status.code = 401))
+targets:
+  - name: europe-west3
+    url: https://api.apigee-bap7.agenticplatform.dev/aiplatform/europe-west3/v1
+    flows:
+      - name: EventFlow
+        mode: Response
+        steps:
+          - name: JS-Analytics
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+  - name: europe-west10
+    url: https://api.apigee-bap7.agenticplatform.dev/aiplatform/europe-west10/v1
+    flows:
+      - name: EventFlow
+        mode: Response
+        steps:
+          - name: JS-Analytics
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+  - name: us-east1
+    url: https://api.apigee-bap7.agenticplatform.dev/aiplatform/us-east1/v1
+    flows:
+      - name: EventFlow
+        mode: Response
+        steps:
+          - name: JS-Analytics
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+policies:
+  - name: CORS-AllowAll
+    type: CORS
+    content:
+      CORS:
+        metadata:
+          name: CORS-AllowAll
+        AllowOrigins: "*"
+        AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        AllowHeaders: "*"
+        ExposeHeaders: "*"
+        MaxAge: "3600"
+        AllowCredentials: "false"
+        GeneratePreflightResponse: "true"
+  - name: EV-ExtractBearerKey
+    type: ExtractVariables
+    content:
+      ExtractVariables:
+        metadata:
+          name: EV-ExtractBearerKey
+        IgnoreUnresolvedVariables: "true"
+        Source: request
+        Header:
+          - metadata:
+              name: Authorization
+            Pattern:
+              metadata:
+                ignoreCase: "true"
+              value: "Bearer {flow.bearer_token}"
+  - name: JS-DetectAuthType
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-DetectAuthType
+          timeLimit: "200"
+        ResourceURL: jsc://detect-auth-type.js
+  - name: RF-MissingAuth
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-MissingAuth
+        FaultResponse:
+          Set:
+            StatusCode: 401
+            ReasonPhrase: Unauthorized
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"unauthorized","message":"Missing Authorization Bearer token or API key"}'
+  - name: VA-VerifyKey
+    type: VerifyAPIKey
+    content:
+      VerifyAPIKey:
+        metadata:
+          name: VA-VerifyKey
+        APIKey:
+          metadata:
+            ref: flow.api_key
+  - name: JS-ValidateQuotaModel
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ValidateQuotaModel
+          timeLimit: "200"
+        ResourceURL: jsc://validate-quota-model.js
+  - name: RF-ModelNotAllowed
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-ModelNotAllowed
+        FaultResponse:
+          Set:
+            StatusCode: 403
+            ReasonPhrase: Forbidden
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"forbidden","message":"Model not allowed by API product"}'
+  - name: AM-QuotaExhaustion
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-QuotaExhaustion
+        Set:
+          StatusCode: 429
+          ReasonPhrase: Too Many Requests
+          Headers:
+            - Header:
+                metadata:
+                  name: Content-Type
+                value: application/json
+          Payload:
+            metadata:
+              contentType: application/json
+            value: '{"error":"quota_exhausted","message":"LLM token quota exhausted"}'
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: JS-Analytics
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-Analytics
+          timeLimit: "200"
+        ResourceURL: jsc://analytics.js
+  - name: JS-ResetUsageDataFound
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ResetUsageDataFound
+          timeLimit: "200"
+        ResourceURL: jsc://reset-usage-data-found.js
+  - name: DC-TokenAnalytics
+    type: DataCapture
+    content:
+      DataCapture:
+        metadata:
+          name: DC-TokenAnalytics
+          continueOnError: "true"
+          enabled: "true"
+        DisplayName: DC-TokenAnalytics
+        IgnoreUnresolvedVariables: "true"
+        Capture:
+          - Collect:
+              metadata:
+                ref: ai.model
+                default: unknown
+            DataCollector: dc_ai_model
+          - Collect:
+              metadata:
+                ref: ai.promptTokenCount
+                default: "0"
+            DataCollector: dc_ai_prompt_token_count
+          - Collect:
+              metadata:
+                ref: ai.responseTokenCount
+                default: "0"
+            DataCollector: dc_ai_response_token_count
+          - Collect:
+              metadata:
+                ref: ai.totalTokenCount
+                default: "0"
+            DataCollector: dc_ai_total_token_count
+          - Collect:
+              metadata:
+                ref: ai.responseType
+                default: unknown
+            DataCollector: dc_ai_response_type
+          - Collect:
+              metadata:
+                ref: ai.timeToFirstToken
+                default: "0"
+            DataCollector: dc_ai_time_first_token
+          - Collect:
+              metadata:
+                ref: ai.costCenter
+                default: unknown
+            DataCollector: dc_ai_cost_center
+          - Collect:
+              metadata:
+                ref: ai.requestCost
+                default: "0"
+            DataCollector: dc_ai_request_cost
+          - Collect:
+              metadata:
+                ref: ai.responseCost
+                default: "0"
+            DataCollector: dc_ai_response_cost
+          - Collect:
+              metadata:
+                ref: ai.totalCost
+                default: "0"
+            DataCollector: dc_ai_total_cost
+  - name: JS-ExtractModelName
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ExtractModelName
+          timeLimit: "200"
+        ResourceURL: jsc://extract-model-name.js
+  - name: JS-ExtractTokenUsage
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ExtractTokenUsage
+          timeLimit: "200"
+        ResourceURL: jsc://extract-token-usage.js
+  - name: LTQ-QuotaEnforce
+    type: LLMTokenQuota
+    content:
+      LLMTokenQuota:
+        metadata:
+          continueOnError: "false"
+          enabled: "true"
+          name: LTQ-QuotaEnforce
+          type: calendar
+        DisplayName: LTQ-QuotaEnforce
+        Properties: {}
+        UseQuotaConfigInAPIProduct:
+          metadata:
+            stepName: VA-VerifyKey
+        EnforceOnly: "true"
+        SharedName: llm-quota
+        Distributed: "false"
+        Synchronous: "false"
+        StartTime: 2013-08-21 10:00:00
+        AsynchronousConfiguration:
+          SyncIntervalInSeconds: "20"
+          SyncMessageCount: "5"
+        LLMModelSource: "{ai.model}"
+  - name: LTQ-QuotaCount
+    type: LLMTokenQuota
+    content:
+      LLMTokenQuota:
+        metadata:
+          continueOnError: "false"
+          enabled: "true"
+          name: LTQ-QuotaCount
+          type: calendar
+        DisplayName: LTQ-QuotaCount
+        Properties: {}
+        UseQuotaConfigInAPIProduct:
+          metadata:
+            stepName: VA-VerifyKey
+        CountOnly: "true"
+        SharedName: llm-quota
+        Distributed: "false"
+        Synchronous: "false"
+        StartTime: 2013-08-21 10:00:00
+        AsynchronousConfiguration:
+          SyncIntervalInSeconds: "20"
+          SyncMessageCount: "5"
+        LLMTokenUsageSource: "{ai.totalTokenCount}"
+        LLMModelSource: "{ai.model}"
+  - name: JS-PrepareDownstreamFromApiKey
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-PrepareDownstreamFromApiKey
+          timeLimit: "200"
+        ResourceURL: jsc://prepare-downstream-from-apikey.js
+  - name: KVM-GetSecurityKeys
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetSecurityKeys
+          mapIdentifier: OIDC-Users
+        Scope: environment
+        Get:
+          - metadata:
+              assignTo: public.key
+            Key:
+              Parameter: "key:public_key"
+          - metadata:
+              assignTo: private.key
+            Key:
+              Parameter: "key:private_key"
+  - name: JWT-VerifyOIDCToken
+    type: VerifyJWT
+    content:
+      VerifyJWT:
+        metadata:
+          name: JWT-VerifyOIDCToken
+        Algorithm: RS256
+        IgnoreUnresolvedVariables: "false"
+        Source: flow.bearer_token
+        PublicKey:
+          Value:
+            metadata:
+              ref: public.key
+        Issuer:
+          metadata:
+            ref: flow.token_issuer
+        Audience:
+          metadata:
+            ref: flow.jwt_aud
+  - name: JS-CheckModelScopeAndPrepareDownstream
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-CheckModelScopeAndPrepareDownstream
+          timeLimit: "200"
+        ResourceURL: jsc://check-model-scope.js
+  - name: RF-InsufficientModelScope
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-InsufficientModelScope
+        FaultResponse:
+          Set:
+            StatusCode: 403
+            ReasonPhrase: Forbidden
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"insufficient_scope","message":"Token missing starter-models or advanced-models scope"}'
+  - name: JWT-GenerateDownstreamToken
+    type: GenerateJWT
+    content:
+      GenerateJWT:
+        metadata:
+          name: JWT-GenerateDownstreamToken
+        Algorithm: RS256
+        IgnoreUnresolvedVariables: "false"
+        PrivateKey:
+          Value:
+            metadata:
+              ref: private.key
+        Issuer:
+          metadata:
+            ref: flow.token_issuer
+        Audience:
+          metadata:
+            ref: flow.downstream_aud
+        ExpiresIn: 5m
+        Subject:
+          metadata:
+            ref: flow.downstream_sub
+        AdditionalClaims:
+          Claim:
+            - metadata:
+                name: scope
+                ref: flow.downstream_scope
+        OutputVariable: flow.downstream_jwt
+  - name: AM-SetDownstreamBearerToken
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-SetDownstreamBearerToken
+        Set:
+          Headers:
+            - Header:
+                metadata:
+                  name: Authorization
+                value: "Bearer {flow.downstream_jwt}"
+  - name: RF-USNotAllowed
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-USNotAllowed
+        FaultResponse:
+          Set:
+            StatusCode: 503
+            ReasonPhrase: Service Unavailable
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"Service Unavailable","message":"Routing to US endpoints is not allowed when x-data-classification is true"}'
+  - name: LC-West3Health
+    type: LookupCache
+    content:
+      LookupCache:
+        metadata:
+          name: LC-West3Health
+        CacheKey:
+          KeyFragment:
+            - value: health
+            - value: europe-west3
+        Scope: Proxy
+        AssignTo: flow.west3_health
+  - name: LC-West10Health
+    type: LookupCache
+    content:
+      LookupCache:
+        metadata:
+          name: LC-West10Health
+        CacheKey:
+          KeyFragment:
+            - value: health
+            - value: europe-west10
+        Scope: Proxy
+        AssignTo: flow.west10_health
+  - name: LC-East1Health
+    type: LookupCache
+    content:
+      LookupCache:
+        metadata:
+          name: LC-East1Health
+        CacheKey:
+          KeyFragment:
+            - value: health
+            - value: us-east1
+        Scope: Proxy
+        AssignTo: flow.east1_health
+  - name: JS-SelectRegion
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-SelectRegion
+          timeLimit: "200"
+        ResourceURL: jsc://select-region.js
+  - name: LC-SmartCounts
+    type: LookupCache
+    content:
+      LookupCache:
+        metadata:
+          name: LC-SmartCounts
+        CacheKey:
+          KeyFragment:
+            - value: smart_counts_v1
+        Scope: Proxy
+        AssignTo: flow.smart_counts_json
+  - name: PC-SmartCounts
+    type: PopulateCache
+    content:
+      PopulateCache:
+        metadata:
+          name: PC-SmartCounts
+        CacheKey:
+          KeyFragment:
+            - value: smart_counts_v1
+        Scope: Proxy
+        Source: flow.new_smart_counts_json
+        ExpirySettings:
+          TimeoutInSec: "3600"
+  - name: JS-RecordRegionFailure
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-RecordRegionFailure
+          timeLimit: "200"
+        ResourceURL: jsc://record-failure.js
+  - name: PC-MarkRegionUnhealthy
+    type: PopulateCache
+    content:
+      PopulateCache:
+        metadata:
+          name: PC-MarkRegionUnhealthy
+        CacheKey:
+          KeyFragment:
+            - value: health
+            - metadata:
+                ref: flow.selected_region
+        Scope: Proxy
+        Source: flow.region_error_payload
+        ExpirySettings:
+          TimeoutInSec: "120"
+  - name: AM-Redirect307
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-Redirect307
+        Set:
+          StatusCode: 307
+          ReasonPhrase: Temporary Redirect
+          Headers:
+            - Header:
+                metadata:
+                  name: Location
+                value: "{flow.other_region_url}"
+          Payload:
+            metadata:
+              contentType: application/json
+            value: '{"status":"failover_redirect","failed_region":"{flow.selected_region}","redirect_region":"{flow.other_region}","location":"{flow.other_region_url}"}'
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: RF-AllRegionsUnavailable
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-AllRegionsUnavailable
+        FaultResponse:
+          Set:
+            StatusCode: 503
+            ReasonPhrase: Service Unavailable
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"Service Unavailable","message":"All allowed backend regions are currently unhealthy; retrying after 2-minute cooldown"}'
+  - name: AM-UnauthorizedModel
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-UnauthorizedModel
+        Set:
+          StatusCode: 401
+          ReasonPhrase: Unauthorized
+          Headers:
+            - Header:
+                metadata:
+                  name: Content-Type
+                value: application/json
+          Payload:
+            metadata:
+              contentType: application/json
+            value: '{"error":"unauthorized","message":"Invalid or unauthorized API key or token for model access"}'
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: AM-SetRegionUsedHeader
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-SetRegionUsedHeader
+        IgnoreUnresolvedVariables: "true"
+        Set:
+          Headers:
+            - Header:
+                metadata:
+                  name: x-region-used
+                value: "{flow.selected_region}"
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: AM-SetSmartResultHeader
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-SetSmartResultHeader
+        Set:
+          Headers:
+            - Header:
+                metadata:
+                  name: x-smart-result
+                value: "{flow.smart_result}"
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: AM-SetSmartOverrideHeader
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-SetSmartOverrideHeader
+        Set:
+          Headers:
+            - Header:
+                metadata:
+                  name: x-smart-override
+                value: "{flow.smart_override}"
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: AM-SetSmartLiteHeader
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-SetSmartLiteHeader
+        Set:
+          Headers:
+            - Header:
+                metadata:
+                  name: x-smart-lite
+                value: "{flow.smart_lite_pct}"
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: AM-SetSmartMediumHeader
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-SetSmartMediumHeader
+        Set:
+          Headers:
+            - Header:
+                metadata:
+                  name: x-smart-medium
+                value: "{flow.smart_medium_pct}"
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: AM-SetSmartThinkingHeader
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-SetSmartThinkingHeader
+        Set:
+          Headers:
+            - Header:
+                metadata:
+                  name: x-smart-thinking
+                value: "{flow.smart_thinking_pct}"
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: KVM-GetAIFlags
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetAIFlags
+          mapIdentifier: AI-Demo
+        ExpiryTimeInSecs: "1"
+        Get:
+          - metadata:
+              assignTo: flow.lite_model
+            Key:
+              Parameter: lite-model
+          - metadata:
+              assignTo: flow.medium_model
+            Key:
+              Parameter: medium-model
+          - metadata:
+              assignTo: flow.thinking_model
+            Key:
+              Parameter: thinking-model
+          - metadata:
+              assignTo: flow.lite_percent
+            Key:
+              Parameter: lite-model-percent
+          - metadata:
+              assignTo: flow.medium_percent
+            Key:
+              Parameter: medium-model-percent
+          - metadata:
+              assignTo: flow.thinking_percent
+            Key:
+              Parameter: thinking-model-percent
+          - metadata:
+              assignTo: flow.screen_prompt
+            Key:
+              Parameter: screen-prompt
+          - metadata:
+              assignTo: flow.mask_prompt
+            Key:
+              Parameter: mask-prompt
+          - metadata:
+              assignTo: ai.prices
+            Key:
+              Parameter: PriceList
+  - name: KVM-GetModelOverride
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetModelOverride
+          mapIdentifier: AI-Demo
+        ExpiryTimeInSecs: "1"
+        Get:
+          - metadata:
+              assignTo: flow.override_model
+            Key:
+              Parameter:
+                metadata:
+                  ref: flow.override_kvm_key
+  - name: JS-ApplyModelOverride
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ApplyModelOverride
+          timeLimit: "200"
+        ResourceURL: jsc://apply-model-override.js
+  - name: JS-ParsePromptPayload
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ParsePromptPayload
+          timeLimit: "200"
+        ResourceURL: jsc://parse-prompt-payload.js
+  - name: JS-PrepareDLPRequest
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-PrepareDLPRequest
+          timeLimit: "200"
+        ResourceURL: jsc://prepare-dlp-request.js
+  - name: SC-CallDLP
+    type: ServiceCallout
+    content:
+      ServiceCallout:
+        metadata:
+          name: SC-CallDLP
+          continueOnError: "true"
+          enabled: "true"
+        Request:
+          metadata:
+            clearPayload: "true"
+          Set:
+            Verb: POST
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: "{flow.dlp_payload}"
+        Response: dlpResponse
+        Timeout: "5000"
+        HTTPTargetConnection:
+          URL: https://dlp.googleapis.com/v2/projects/{organization.name}/content:deidentify
+          Authentication:
+            GoogleAccessToken:
+              Scopes:
+                - Scope: https://www.googleapis.com/auth/cloud-platform
+  - name: JS-ApplyMaskedPrompt
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ApplyMaskedPrompt
+          timeLimit: "200"
+        ResourceURL: jsc://apply-masked-prompt.js
+  - name: JS-PrepareModelArmorRequest
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-PrepareModelArmorRequest
+          timeLimit: "200"
+        ResourceURL: jsc://prepare-model-armor-request.js
+  - name: SC-CallModelArmor
+    type: ServiceCallout
+    content:
+      ServiceCallout:
+        metadata:
+          name: SC-CallModelArmor
+          continueOnError: "true"
+          enabled: "true"
+        Request:
+          metadata:
+            clearPayload: "true"
+          Set:
+            Verb: POST
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: "{flow.model_armor_payload}"
+        Response: modelArmorResponse
+        Timeout: "5000"
+        HTTPTargetConnection:
+          URL: https://modelarmor.eu.rep.googleapis.com/v1/projects/{organization.name}/locations/eu/templates/ai-demo-guardrails:sanitizeUserPrompt
+          Authentication:
+            GoogleAccessToken:
+              Scopes:
+                - Scope: https://www.googleapis.com/auth/cloud-platform
+  - name: JS-CheckModelArmorResponse
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-CheckModelArmorResponse
+          timeLimit: "200"
+        ResourceURL: jsc://check-model-armor-response.js
+  - name: RF-PromptBlocked
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-PromptBlocked
+        FaultResponse:
+          Set:
+            StatusCode: 403
+            ReasonPhrase: Forbidden
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"prompt_blocked","message":"Prompt blocked by Model Armor guardrails"}'
+  - name: JS-PrepareSmartRouterRequest
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-PrepareSmartRouterRequest
+          timeLimit: "200"
+        ResourceURL: jsc://prepare-smart-router-request.js
+  - name: SC-CallGeminiSmartRouter
+    type: ServiceCallout
+    content:
+      ServiceCallout:
+        metadata:
+          name: SC-CallGeminiSmartRouter
+          continueOnError: "true"
+          enabled: "true"
+        Request:
+          metadata:
+            clearPayload: "true"
+          Set:
+            Verb: POST
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: "{flow.smart_router_payload}"
+        Response: smartRouterResponse
+        Timeout: "5000"
+        HTTPTargetConnection:
+          URL: https://aiplatform.googleapis.com/v1/projects/{organization.name}/locations/global/publishers/google/models/gemini-3.5-flash-lite:generateContent
+          Authentication:
+            GoogleAccessToken:
+              Scopes:
+                - Scope: https://www.googleapis.com/auth/cloud-platform
+  - name: JS-ApplySmartModel
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ApplySmartModel
+          timeLimit: "200"
+        ResourceURL: jsc://apply-smart-model.js
+resources:
+  - name: detect-auth-type.js
+    type: jsc
+    content: |
+      var token = String(context.getVariable("flow.bearer_token") || "").trim();
+      var host = context.getVariable("request.header.host") || "";
+      var proto = context.getVariable("client.scheme") || "https";
+      context.setVariable("flow.token_issuer", proto + "://" + host);
+      if (!token) {
+        context.setVariable("flow.auth_type", "none");
+      } else {
+        var parts = token.split(".");
+        if (parts.length === 3) {
+          context.setVariable("flow.auth_type", "jwt");
+          var aud = "";
+          try {
+            var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            var b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+            var out = "";
+            for (var bc = 0, bs = 0, buffer, idx = 0; (buffer = b64.charAt(idx++)); ) {
+              var pos = chars.indexOf(buffer);
+              if (pos !== -1) {
+                bs = bc % 4 ? bs * 64 + pos : pos;
+                if (bc++ % 4) out += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+              }
+            }
+            var payload = JSON.parse(out);
+            if (Array.isArray(payload.aud)) {
+              aud = String(payload.aud[0] || "");
+            } else if (payload.aud) {
+              aud = String(payload.aud);
+            }
+          } catch (e) {}
+          context.setVariable("flow.jwt_aud", aud);
+        } else {
+          context.setVariable("flow.auth_type", "apikey");
+          context.setVariable("flow.api_key", token);
+        }
+      }
+  - name: prepare-downstream-from-apikey.js
+    type: jsc
+    content: |
+      var appName = context.getVariable("verifyapikey.VA-VerifyKey.developer.app.name") || "api-key-client";
+      context.setVariable("flow.downstream_aud", "ai-platform-multi-region");
+      context.setVariable("flow.downstream_sub", String(appName));
+      context.setVariable("flow.downstream_scope", "model-access");
+  - name: check-model-scope.js
+    type: jsc
+    content: |
+      var scopeRaw = String(context.getVariable("jwt.JWT-VerifyOIDCToken.claim.scope") || "");
+      var scopes = scopeRaw.split(/\s+/);
+      var hasStarter = false;
+      var hasAdvanced = false;
+      for (var i = 0; i < scopes.length; i++) {
+        if (scopes[i] === "starter-models") hasStarter = true;
+        if (scopes[i] === "advanced-models") hasAdvanced = true;
+      }
+
+      if (hasAdvanced || hasStarter) {
+        var sub = context.getVariable("jwt.JWT-VerifyOIDCToken.claim.subject") ||
+                  context.getVariable("flow.jwt_aud") ||
+                  "ai-router";
+        context.setVariable("flow.has_valid_model_scope", "true");
+        context.setVariable("flow.skip_failover", "false");
+        context.setVariable("flow.downstream_aud", "ai-platform-multi-region");
+        context.setVariable("flow.downstream_sub", String(sub));
+        context.setVariable("flow.downstream_scope", "model-access");
+      } else {
+        context.setVariable("flow.has_valid_model_scope", "false");
+        context.setVariable("flow.skip_failover", "true");
+      }
+  - name: extract-model-name.js
+    type: jsc
+    content: |
+      var raw = context.getVariable("request.content");
+      if (raw) {
+        try {
+          var body = JSON.parse(raw);
+          if (body.model) {
+            context.setVariable("ai.model", String(body.model));
+          }
+        } catch (e) {}
+      }
+  - name: validate-quota-model.js
+    type: jsc
+    content: |
+      var productContent = context.getVariable("verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.filteredConfigs");
+      var modelName = String(context.getVariable("ai.model") || "").trim();
+      context.setVariable("flow.model_not_allowed", "false");
+
+      if (!modelName || !productContent) {
+        context.setVariable("flow.model_not_allowed", "true");
+        context.setVariable("flow.skip_failover", "true");
+      } else {
+        var cleanModel = modelName.indexOf("/") !== -1 ? modelName.split("/").pop() : modelName;
+        var data = productContent;
+        if (typeof productContent === "string") {
+          try { data = JSON.parse(productContent); } catch (e) { data = null; }
+        } else if (productContent && productContent.asJSON) {
+          data = productContent.asJSON;
+        }
+
+        var allowed = false;
+        var limit = -1;
+        if (Array.isArray(data)) {
+          for (var i = 0; i < data.length; i++) {
+            var entry = data[i];
+            if (entry && Array.isArray(entry.llmOperations)) {
+              for (var j = 0; j < entry.llmOperations.length; j++) {
+                var op = entry.llmOperations[j];
+                if (op && op.model) {
+                  var opModel = String(op.model);
+                  var cleanOpModel = opModel.indexOf("/") !== -1 ? opModel.split("/").pop() : opModel;
+                  if (opModel === modelName || cleanOpModel === cleanModel) {
+                    allowed = true;
+                    if (entry.llmTokenQuota && entry.llmTokenQuota.limit !== undefined && entry.llmTokenQuota.limit !== null && entry.llmTokenQuota.limit !== "") {
+                      limit = entry.llmTokenQuota.limit;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (!allowed) {
+          context.setVariable("flow.model_not_allowed", "true");
+          context.setVariable("flow.skip_failover", "true");
+        } else if (limit !== -1) {
+          context.setVariable("ai.modelTokenLimit", String(limit));
+        }
+      }
+  - name: analytics.js
+    type: jsc
+    content: |
+      function safeJsonParse(str) {
+        if (!str) return null;
+        if (typeof str === "object") return str;
+        if (typeof str !== "string") return null;
+        var cleaned = str.trim();
+        if (cleaned.indexOf("{") !== 0 && cleaned.indexOf("[") !== 0) return null;
+        try { return JSON.parse(cleaned); } catch (e1) {
+          try { return JSON.parse(cleaned.replace(/\r?\n/g, "\\n")); } catch (e2) { return null; }
+        }
+      }
+
+      function extractUsageData(contentString) {
+        var usageData = { model: "", requestTokenCount: 0, responseTokenCount: 0, totalTokenCount: 0, usageFound: false };
+        if (!contentString) return usageData;
+        var cleaned = typeof contentString === "string" ? contentString.trim() : "";
+        if (!cleaned && typeof contentString === "object") {
+          try { cleaned = JSON.stringify(contentString); } catch (e) { return usageData; }
+        }
+        if (cleaned.indexOf("[DONE]") !== -1 || cleaned.indexOf("message_stop") !== -1 || cleaned.indexOf("content_block") !== -1 || cleaned.indexOf("event: ping") !== -1) {
+          return usageData;
+        }
+        if (cleaned.indexOf("data:") !== -1) {
+          var lines = cleaned.split(/\r?\n/);
+          for (var i = lines.length - 1; i >= 0; i--) {
+            var l = lines[i].trim();
+            if (l.indexOf("data:") === 0) {
+              var candidate = l.substring(5).trim();
+              if (candidate.indexOf("{") === 0) { cleaned = candidate; break; }
+            }
+          }
+        } else if (cleaned.indexOf("event: ") === 0) {
+          var firstBrace = cleaned.indexOf("{");
+          if (firstBrace !== -1) cleaned = cleaned.substring(firstBrace).trim();
+        }
+        if (!cleaned || cleaned.indexOf("{") !== 0) return usageData;
+        try {
+          var d = JSON.parse(cleaned);
+          if (d.model) usageData.model = d.model;
+          if (d.modelVersion) usageData.model = d.modelVersion;
+          if (d.message && d.message.model) usageData.model = d.message.model;
+
+          if (d.usage && d.usage.prompt_tokens !== undefined) usageData.requestTokenCount = d.usage.prompt_tokens;
+          if (d.message && d.message.usage && d.message.usage.input_tokens !== undefined) usageData.requestTokenCount = d.message.usage.input_tokens;
+          if (d.usage && d.usage.input_tokens !== undefined) usageData.requestTokenCount = d.usage.input_tokens;
+          if (d.usageMetadata && d.usageMetadata.promptTokenCount !== undefined) usageData.requestTokenCount = d.usageMetadata.promptTokenCount;
+
+          if (d.usage && d.usage.completion_tokens !== undefined) usageData.responseTokenCount = d.usage.completion_tokens;
+          if (d.message && d.message.usage && d.message.usage.output_tokens !== undefined) usageData.responseTokenCount = d.message.usage.output_tokens;
+          if (d.usage && d.usage.output_tokens !== undefined) usageData.responseTokenCount = d.usage.output_tokens;
+          if (d.usageMetadata && d.usageMetadata.candidatesTokenCount !== undefined) usageData.responseTokenCount = d.usageMetadata.candidatesTokenCount;
+
+          if (!usageData.responseTokenCount) {
+            if (d.usage && d.usage.completion_tokens_details && d.usage.completion_tokens_details.reasoning_tokens !== undefined) {
+              usageData.responseTokenCount = d.usage.completion_tokens_details.reasoning_tokens;
+            } else if (d.usageMetadata && d.usageMetadata.thoughtsTokenCount !== undefined) {
+              usageData.responseTokenCount = d.usageMetadata.thoughtsTokenCount;
+            }
+          }
+          if (usageData.requestTokenCount > 0 || usageData.responseTokenCount > 0) usageData.usageFound = true;
+          usageData.totalTokenCount = usageData.requestTokenCount + usageData.responseTokenCount;
+        } catch (e) {}
+        return usageData;
+      }
+
+      var currentFlow = context.getVariable("current.flow.name");
+      var type = currentFlow === "EventFlow" ? "streaming" : "non-streaming";
+      var contentString = currentFlow === "EventFlow"
+        ? context.getVariable("response.event.current.content")
+        : context.getVariable("response.content");
+      if (!contentString) {
+        contentString = context.getVariable("response.content") || context.getVariable("response.event.current.content");
+      }
+
+      var prices = safeJsonParse(context.getVariable("ai.prices"));
+      if (!prices || !prices["default"]) {
+        prices = { "default": { "requestPerMillionTokens": 1, "responsePerMillionTokens": 3 } };
+      }
+      context.setVariable("ai.responseType", type);
+
+      var usageData = extractUsageData(contentString);
+      var modelName = String(context.getVariable("ai.model") || usageData.model || "");
+      if (usageData.model) {
+        modelName = usageData.model;
+        context.setVariable("ai.model", modelName);
+      }
+
+      var existingReqTokenCount = context.getVariable("ai.requestTokenCount");
+      if (existingReqTokenCount && !usageData.requestTokenCount) {
+        usageData.requestTokenCount = parseInt(existingReqTokenCount, 10) || 0;
+      }
+
+      if (usageData.usageFound) {
+        context.setVariable("ai.usageDataFound", "true");
+        context.setVariable("ai.promptTokenCount", String(usageData.requestTokenCount));
+        context.setVariable("ai.requestTokenCount", String(usageData.requestTokenCount));
+        context.setVariable("ai.responseTokenCount", String(usageData.responseTokenCount));
+        usageData.totalTokenCount = usageData.requestTokenCount + usageData.responseTokenCount;
+        context.setVariable("ai.totalTokenCount", String(usageData.totalTokenCount));
+
+        var timeToFirstToken = context.getVariable("ai.timeToFirstToken");
+        if (!timeToFirstToken) {
+          var reqStart = context.getVariable("client.received.start.timestamp");
+          if (reqStart) {
+            timeToFirstToken = Date.now() - reqStart;
+            context.setVariable("ai.timeToFirstToken", String(timeToFirstToken));
+          }
+        }
+
+        var costCenter = context.getVariable("ai.costCenter") ||
+                         context.getVariable("verifyapikey.VA-VerifyKey.developer.app.name") ||
+                         context.getVariable("flow.downstream_sub") ||
+                         "unknown";
+        context.setVariable("ai.costCenter", String(costCenter));
+
+        var cleanModel = modelName.indexOf("/") !== -1 ? modelName.split("/").pop() : modelName;
+        var priceEntry = prices[modelName] || prices[cleanModel] || prices["default"];
+        var reqPrice = parseFloat(priceEntry.requestPerMillionTokens) || 0;
+        var respPrice = parseFloat(priceEntry.responsePerMillionTokens) || 0;
+        var reqCost = parseFloat(usageData.requestTokenCount) * (reqPrice / 1000000);
+        var respCost = parseFloat(usageData.responseTokenCount) * (respPrice / 1000000);
+
+        context.setVariable("ai.requestCost", String(reqCost));
+        context.setVariable("ai.responseCost", String(respCost));
+        context.setVariable("ai.totalCost", String(reqCost + respCost));
+      } else {
+        context.setVariable("ai.usageDataFound", "false");
+      }
+  - name: reset-usage-data-found.js
+    type: jsc
+    content: |
+      context.setVariable("ai.usageDataFound", "false");
+  - name: extract-token-usage.js
+    type: jsc
+    content: |
+      var raw = context.getVariable("response.content");
+      if (raw) {
+        try {
+          var body = JSON.parse(raw);
+          if (body.usageMetadata && body.usageMetadata.totalTokenCount !== undefined) {
+            context.setVariable("ai.totalTokenCount", String(body.usageMetadata.totalTokenCount));
+          } else if (body.usage && body.usage.total_tokens !== undefined) {
+            context.setVariable("ai.totalTokenCount", String(body.usage.total_tokens));
+          }
+        } catch (e) {}
+      }
+  - name: select-region.js
+    type: jsc
+    content: |
+      var west3Healthy = !context.getVariable("flow.west3_health");
+      var west10Healthy = !context.getVariable("flow.west10_health");
+      var east1Healthy = !context.getVariable("flow.east1_health");
+
+      var classification = String(context.getVariable("request.header.x-data-classification") || "").toLowerCase();
+      var forceEU = (classification === "true" || classification === "high" || classification === "eu");
+
+      var basePath = context.getVariable("proxy.basepath") || "";
+      var pathSuffix = context.getVariable("proxy.pathsuffix") || "";
+      var isUsEndpoint = (basePath.indexOf("/airouter/us/") !== -1 || basePath.indexOf("/airouter/us-east1/") !== -1);
+
+      if (forceEU && isUsEndpoint) {
+        context.setVariable("flow.force_eu", "true");
+        context.setVariable("flow.us_not_allowed", "true");
+        context.setVariable("flow.short_circuit_503", "true");
+        context.setVariable("flow.all_regions_unhealthy", "false");
+      } else {
+        function pickRandom(list) {
+          return list[Math.floor(Math.random() * list.length)];
+        }
+
+        var euHealthy = [];
+        if (west3Healthy) euHealthy.push("europe-west3");
+        if (west10Healthy) euHealthy.push("europe-west10");
+
+        var allHealthy = [];
+        if (west3Healthy) allHealthy.push("europe-west3");
+        if (west10Healthy) allHealthy.push("europe-west10");
+        if (east1Healthy) allHealthy.push("us-east1");
+
+        var allUnavailable = false;
+        var selected = "europe-west3";
+        if (forceEU || basePath.indexOf("/airouter/eu/") !== -1) {
+          if (forceEU && basePath.indexOf("europe-west3") !== -1 && west3Healthy) {
+            selected = "europe-west3";
+          } else if (forceEU && basePath.indexOf("europe-west10") !== -1 && west10Healthy) {
+            selected = "europe-west10";
+          } else if (euHealthy.length > 0) {
+            selected = pickRandom(euHealthy);
+          } else {
+            allUnavailable = true;
+          }
+        } else if (isUsEndpoint) {
+          if (east1Healthy) {
+            selected = "us-east1";
+          } else if (euHealthy.length > 0) {
+            selected = pickRandom(euHealthy);
+          } else {
+            allUnavailable = true;
+          }
+        } else if (basePath.indexOf("europe-west3") !== -1) {
+          if (west3Healthy) {
+            selected = "europe-west3";
+          } else {
+            var alt3 = [];
+            if (west10Healthy) alt3.push("europe-west10");
+            if (east1Healthy) alt3.push("us-east1");
+            if (alt3.length > 0) {
+              selected = pickRandom(alt3);
+            } else {
+              allUnavailable = true;
+            }
+          }
+        } else if (basePath.indexOf("europe-west10") !== -1) {
+          if (west10Healthy) {
+            selected = "europe-west10";
+          } else {
+            var alt10 = [];
+            if (west3Healthy) alt10.push("europe-west3");
+            if (east1Healthy) alt10.push("us-east1");
+            if (alt10.length > 0) {
+              selected = pickRandom(alt10);
+            } else {
+              allUnavailable = true;
+            }
+          }
+        } else {
+          // global: distribute across all allowed healthy regions
+          if (allHealthy.length > 0) {
+            selected = pickRandom(allHealthy);
+          } else {
+            allUnavailable = true;
+          }
+        }
+
+        var otherCandidates = (forceEU || basePath.indexOf("/airouter/eu/") !== -1)
+          ? euHealthy
+          : allHealthy;
+        var others = [];
+        for (var i = 0; i < otherCandidates.length; i++) {
+          if (otherCandidates[i] !== selected) others.push(otherCandidates[i]);
+        }
+        var other = others.length > 0 ? pickRandom(others) : "";
+
+        context.setVariable("flow.force_eu", forceEU ? "true" : "false");
+        context.setVariable("flow.us_not_allowed", "false");
+        context.setVariable("flow.all_regions_unhealthy", allUnavailable ? "true" : "false");
+        context.setVariable("flow.short_circuit_503", allUnavailable ? "true" : "false");
+        context.setVariable("flow.selected_region", selected);
+        context.setVariable("flow.other_region", other);
+        var baseOrigin = (context.getVariable("client.scheme") || "https") + "://" + (context.getVariable("request.header.host") || "api.apigee-bap7.agenticplatform.dev");
+        context.setVariable("flow.other_region_url", other ? (baseOrigin + "/airouter/" + other + "/v1" + pathSuffix) : "");
+      }
+  - name: record-failure.js
+    type: jsc
+    content: |
+      var selected = context.getVariable("flow.selected_region") || "europe-west3";
+      var forceEU = context.getVariable("flow.force_eu") === "true";
+      var basePath = context.getVariable("proxy.basepath") || "";
+      var euOnly = forceEU || basePath.indexOf("/airouter/eu/") !== -1;
+
+      var west3Healthy = !context.getVariable("flow.west3_health") && selected !== "europe-west3";
+      var west10Healthy = !context.getVariable("flow.west10_health") && selected !== "europe-west10";
+      var east1Healthy = !context.getVariable("flow.east1_health") && selected !== "us-east1";
+
+      var healthyOthers = [];
+      if (west3Healthy) healthyOthers.push("europe-west3");
+      if (west10Healthy) healthyOthers.push("europe-west10");
+      if (!euOnly && east1Healthy) healthyOthers.push("us-east1");
+
+      var other = healthyOthers.length > 0
+        ? healthyOthers[Math.floor(Math.random() * healthyOthers.length)]
+        : "";
+      var allUnavailable = (other === "");
+
+      var pathSuffix = context.getVariable("proxy.pathsuffix") || "";
+      var errMsg = context.getVariable("fault.name") ||
+                   context.getVariable("error.message") ||
+                   "target_error";
+      var statusCode = context.getVariable("error.status.code") ||
+                       context.getVariable("response.status.code") ||
+                       "502";
+
+      var record = {
+        healthy: false,
+        region: selected,
+        lastError: String(errMsg),
+        statusCode: String(statusCode),
+        timestamp: new Date().toISOString()
+      };
+
+      context.setVariable("flow.selected_region", selected);
+      context.setVariable("flow.other_region", other);
+      context.setVariable("flow.all_regions_unhealthy", allUnavailable ? "true" : "false");
+      var baseOrigin = (context.getVariable("client.scheme") || "https") + "://" + (context.getVariable("request.header.host") || "api.apigee-bap7.agenticplatform.dev");
+      context.setVariable("flow.other_region_url", other ? (baseOrigin + "/airouter/" + other + "/v1" + pathSuffix) : "");
+      context.setVariable("flow.region_error_payload", JSON.stringify(record));
+      context.setVariable("response.header.x-region-used", selected);
+  - name: parse-prompt-payload.js
+    type: jsc
+    content: |
+      context.setVariable("flow.is_smart_model", "false");
+      context.setVariable("flow.has_prompt", "false");
+      context.setVariable("flow.has_model", "false");
+      context.setVariable("flow.prompt_blocked", "false");
+
+      var screenHeader = String(context.getVariable("request.header.x-screen-prompt") || "").trim().toLowerCase();
+      if (screenHeader === "true" || screenHeader === "false") {
+        context.setVariable("flow.screen_prompt", screenHeader);
+      }
+      var maskHeader = String(context.getVariable("request.header.x-mask-prompt") || "").trim().toLowerCase();
+      if (maskHeader === "true" || maskHeader === "false") {
+        context.setVariable("flow.mask_prompt", maskHeader);
+      }
+      var raw = context.getVariable("request.content");
+      if (raw) {
+        try {
+          var body = JSON.parse(raw);
+          if (body.model) {
+            var reqModel = String(body.model).trim();
+            context.setVariable("flow.has_model", "true");
+            context.setVariable("flow.requested_model", reqModel);
+            context.setVariable("flow.override_kvm_key", "override-" + reqModel.replace(/\//g, "--"));
+            if (reqModel.toLowerCase().indexOf("smart") === 0) {
+              context.setVariable("flow.is_smart_model", "true");
+            }
+          }
+          var promptText = "";
+          if (Array.isArray(body.messages) && body.messages.length > 0) {
+            for (var i = body.messages.length - 1; i >= 0; i--) {
+              if (body.messages[i].role === "user" && body.messages[i].content) {
+                promptText = typeof body.messages[i].content === "string"
+                  ? body.messages[i].content
+                  : JSON.stringify(body.messages[i].content);
+                context.setVariable("flow.prompt_msg_index", String(i));
+                context.setVariable("flow.prompt_field", "messages");
+                break;
+              }
+            }
+          } else if (typeof body.prompt === "string" && body.prompt) {
+            promptText = body.prompt;
+            context.setVariable("flow.prompt_field", "prompt");
+          }
+          if (promptText) {
+            context.setVariable("flow.prompt_text", promptText);
+            context.setVariable("flow.has_prompt", "true");
+          }
+        } catch (e) {}
+      }
+  - name: prepare-dlp-request.js
+    type: jsc
+    content: |
+      var promptText = context.getVariable("flow.prompt_text") || "";
+      var dlpPayload = {
+        item: { value: promptText },
+        deidentifyConfig: {
+          infoTypeTransformations: {
+            transformations: [
+              {
+                primitiveTransformation: {
+                  replaceWithInfoTypeConfig: {}
+                }
+              }
+            ]
+          }
+        },
+        inspectConfig: {
+          infoTypes: [
+            { name: "EMAIL_ADDRESS" },
+            { name: "PHONE_NUMBER" },
+            { name: "CREDIT_CARD_NUMBER" },
+            { name: "PERSON_NAME" },
+            { name: "US_SOCIAL_SECURITY_NUMBER" }
+          ]
+        }
+      };
+      context.setVariable("flow.dlp_payload", JSON.stringify(dlpPayload));
+  - name: apply-masked-prompt.js
+    type: jsc
+    content: |
+      var status = context.getVariable("dlpResponse.status.code");
+      var dlpRaw = context.getVariable("dlpResponse.content");
+      if (status == 200 && dlpRaw) {
+        try {
+          var dlpData = JSON.parse(dlpRaw);
+          if (dlpData.item && typeof dlpData.item.value === "string") {
+            var masked = dlpData.item.value;
+            context.setVariable("flow.prompt_text", masked);
+            var reqRaw = context.getVariable("request.content");
+            var body = JSON.parse(reqRaw);
+            var field = context.getVariable("flow.prompt_field");
+            if (field === "messages") {
+              var idx = parseInt(context.getVariable("flow.prompt_msg_index"), 10);
+              if (!isNaN(idx) && body.messages && body.messages[idx]) {
+                body.messages[idx].content = masked;
+              }
+            } else if (field === "prompt") {
+              body.prompt = masked;
+            }
+            context.setVariable("request.content", JSON.stringify(body));
+            context.setVariable("request.header.x-dlp-masked", "true");
+          }
+        } catch (e) {}
+      }
+  - name: prepare-model-armor-request.js
+    type: jsc
+    content: |
+      var promptText = context.getVariable("flow.prompt_text") || "";
+      var maPayload = {
+        userPromptData: {
+          text: promptText
+        }
+      };
+      context.setVariable("flow.model_armor_payload", JSON.stringify(maPayload));
+  - name: check-model-armor-response.js
+    type: jsc
+    content: |
+      var status = context.getVariable("modelArmorResponse.status.code");
+      var raw = context.getVariable("modelArmorResponse.content");
+      context.setVariable("flow.prompt_blocked", "false");
+      if (status == 200 && raw) {
+        try {
+          var data = JSON.parse(raw);
+          if (data.sanitizationResult && data.sanitizationResult.filterMatchState === "MATCH_FOUND") {
+            context.setVariable("flow.prompt_blocked", "true");
+          }
+        } catch (e) {}
+      }
+  - name: prepare-smart-router-request.js
+    type: jsc
+    content: |
+      var promptText = context.getVariable("flow.prompt_text") || "";
+      var instruction = "Classify the complexity of this prompt for an LLM. Reply with ONLY one word: lite (simple greeting, lookup, short summary), medium (general coding, analysis, writing), or thinking (deep reasoning, math, architecture, multi-step logic).\n\nPrompt: " + promptText;
+      var geminiPayload = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: instruction }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 10
+        }
+      };
+      context.setVariable("flow.smart_router_payload", JSON.stringify(geminiPayload));
+  - name: apply-smart-model.js
+    type: jsc
+    content: |
+      var liteModel = String(context.getVariable("flow.lite_model") || "google/gemini-3.5-flash-lite").trim();
+      var mediumModel = String(context.getVariable("flow.medium_model") || "google/gemini-4-hydrogen").trim();
+      var thinkingModel = String(context.getVariable("flow.thinking_model") || "google/gemini-4-neon").trim();
+      var level = "lite";
+      var rawClassification = "";
+
+      var status = context.getVariable("smartRouterResponse.status.code");
+      var raw = context.getVariable("smartRouterResponse.content");
+      if (status == 200 && raw) {
+        try {
+          var data = JSON.parse(raw);
+          rawClassification = (data.candidates && data.candidates[0] && data.candidates[0].content &&
+                      data.candidates[0].content.parts && data.candidates[0].content.parts[0] &&
+                      data.candidates[0].content.parts[0].text || "").trim().toLowerCase();
+          if (rawClassification.indexOf("thinking") !== -1) {
+            level = "thinking";
+          } else if (rawClassification.indexOf("medium") !== -1) {
+            level = "medium";
+          } else {
+            level = "lite";
+          }
+        } catch (e) {}
+      }
+
+      var initialLevel = level;
+      var counts = { total: 0, lite: 0, medium: 0, thinking: 0 };
+      var countsJson = context.getVariable("flow.smart_counts_json");
+      if (countsJson) {
+        try {
+          var parsed = JSON.parse(countsJson);
+          counts.total = parseInt(parsed.total, 10) || 0;
+          counts.lite = parseInt(parsed.lite, 10) || 0;
+          counts.medium = parseInt(parsed.medium, 10) || 0;
+          counts.thinking = parseInt(parsed.thinking, 10) || 0;
+        } catch (e) {}
+      }
+
+      var litePctStr = String(context.getVariable("flow.lite_percent") || "").trim();
+      var mediumPctStr = String(context.getVariable("flow.medium_percent") || "").trim();
+      var thinkingPctStr = String(context.getVariable("flow.thinking_percent") || "").trim();
+      var litePct = litePctStr !== "" ? parseFloat(litePctStr) : NaN;
+      var mediumPct = mediumPctStr !== "" ? parseFloat(mediumPctStr) : NaN;
+      var thinkingPct = thinkingPctStr !== "" ? parseFloat(thinkingPctStr) : NaN;
+
+      var newTotal = counts.total + 1;
+      var currentThinkingPct = counts.total > 0 ? (counts.thinking / counts.total) * 100 : 0;
+      var currentMediumPct = counts.total > 0 ? (counts.medium / counts.total) * 100 : 0;
+
+      var downgradedFrom = "";
+      var overrideReason = "none";
+
+      if (level === "thinking" && !isNaN(thinkingPct)) {
+        if (currentThinkingPct > thinkingPct) {
+          downgradedFrom = "thinking";
+          level = "medium";
+          overrideReason = "thinking_current_" + currentThinkingPct.toFixed(2) + "_gt_" + thinkingPct;
+        }
+      }
+      if (level === "medium" && !isNaN(mediumPct)) {
+        if (currentMediumPct > mediumPct) {
+          if (!downgradedFrom) downgradedFrom = "medium";
+          level = "lite";
+          overrideReason = (overrideReason === "none" ? "" : overrideReason + ";") +
+            "medium_current_" + currentMediumPct.toFixed(2) + "_gt_" + mediumPct;
+        }
+      }
+
+      var chosen = liteModel;
+      if (level === "thinking") {
+        chosen = thinkingModel;
+      } else if (level === "medium") {
+        chosen = mediumModel;
+      }
+
+      var afterCounts = {
+        total: newTotal,
+        lite: counts.lite + (level === "lite" ? 1 : 0),
+        medium: counts.medium + (level === "medium" ? 1 : 0),
+        thinking: counts.thinking + (level === "thinking" ? 1 : 0)
+      };
+
+      // Trace & debug variables
+      context.setVariable("flow.smart_raw_classification", rawClassification || "none");
+      context.setVariable("flow.smart_initial_level", initialLevel);
+      context.setVariable("flow.smart_final_level", level);
+      context.setVariable("flow.smart_counts_before", JSON.stringify(counts));
+      context.setVariable("flow.smart_counts_after", JSON.stringify(afterCounts));
+      context.setVariable("flow.smart_pct_config", JSON.stringify({
+        lite: isNaN(litePct) ? null : litePct,
+        medium: isNaN(mediumPct) ? null : mediumPct,
+        thinking: isNaN(thinkingPct) ? null : thinkingPct
+      }));
+      context.setVariable("flow.smart_current_thinking_pct", currentThinkingPct.toFixed(2));
+      context.setVariable("flow.smart_current_medium_pct", currentMediumPct.toFixed(2));
+      context.setVariable("flow.smart_override_reason", overrideReason);
+
+      context.setVariable("flow.new_smart_counts_json", JSON.stringify(afterCounts));
+      context.setVariable("flow.smart_lite_pct", ((afterCounts.lite / afterCounts.total) * 100).toFixed(2) + "%");
+      context.setVariable("flow.smart_medium_pct", ((afterCounts.medium / afterCounts.total) * 100).toFixed(2) + "%");
+      context.setVariable("flow.smart_thinking_pct", ((afterCounts.thinking / afterCounts.total) * 100).toFixed(2) + "%");
+      context.setVariable("flow.smart_result", chosen);
+      context.setVariable("flow.override_kvm_key", "override-" + chosen.replace(/\//g, "--"));
+      context.setVariable("flow.has_smart_override", downgradedFrom ? "true" : "false");
+      context.setVariable("flow.smart_override", downgradedFrom ? (downgradedFrom + "->" + level) : "false");
+
+      try {
+        var reqRaw = context.getVariable("request.content");
+        var body = JSON.parse(reqRaw);
+        body.model = chosen;
+        context.setVariable("request.content", JSON.stringify(body));
+        context.setVariable("request.header.x-smart-model-selected", chosen);
+        context.setVariable("request.header.x-smart-model-level", level);
+        if (downgradedFrom) {
+          context.setVariable("request.header.x-smart-model-downgraded-from", downgradedFrom);
+        }
+      } catch (e) {}
+  - name: apply-model-override.js
+    type: jsc
+    content: |
+      var overrideModel = String(context.getVariable("flow.override_model") || "").trim();
+      if (overrideModel) {
+        try {
+          var reqRaw = context.getVariable("request.content");
+          var body = JSON.parse(reqRaw);
+          var prevModel = body.model || "";
+          body.model = overrideModel;
+          context.setVariable("request.content", JSON.stringify(body));
+          context.setVariable("flow.model_overridden_from", String(prevModel));
+          context.setVariable("flow.model_overridden_to", overrideModel);
+          context.setVariable("request.header.x-model-override", String(prevModel) + "->" + overrideModel);
+          if (context.getVariable("flow.is_smart_model") === "true") {
+            context.setVariable("flow.smart_result", overrideModel);
+          }
+        } catch (e) {}
+      }

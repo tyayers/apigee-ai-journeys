@@ -1,0 +1,207 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/apigee/apigee-templater/main/schema/gateway.schema.1.0.json
+gateway: apigee
+schemaVersion: 1.0.0
+name: customers-a2a-v1
+displayName: Customers A2A API v1
+type: proxy
+description: A2A proxy for the Customers domain on Sample Business Service with local OIDC JWT validation and customer scope enforcement
+categories:
+  - customers
+  - a2a
+parameters:
+  - name: CLOUD_RUN_URL
+    displayName: Cloud Run Deployment URL
+    description: Base URL of the Cloud Run service (e.g. https://sample-business-services-xyz.a.run.app)
+    default: https://sample-business-services-qok4re2efq-ew.a.run.app
+endpoints:
+  - name: default
+    basePath: /v1/a2a/customers
+    routes:
+      - name: default
+        target: default
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-PrepareJwtVerify
+          - name: RF-MissingAuth
+            condition: flow.has_bearer_token != "true"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+          - name: JS-CheckCustomerScope
+          - name: RF-InsufficientCustomerScope
+            condition: flow.has_customer_scope != "true"
+targets:
+  - name: default
+    httpTargetConnection:
+      URL: "https://sample-business-services-qok4re2efq-ew.a.run.app/a2a"
+      Authentication:
+        GoogleIDToken:
+          Audience: "https://sample-business-services-qok4re2efq-ew.a.run.app"
+          IncludeEmail: true
+policies:
+  - name: CORS-AllowAll
+    type: CORS
+    content:
+      CORS:
+        metadata:
+          name: CORS-AllowAll
+        AllowOrigins: "*"
+        AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        AllowHeaders: "*"
+        ExposeHeaders: "*"
+        MaxAge: "3600"
+        AllowCredentials: "false"
+        GeneratePreflightResponse: "true"
+  - name: EV-ExtractBearerKey
+    type: ExtractVariables
+    content:
+      ExtractVariables:
+        metadata:
+          name: EV-ExtractBearerKey
+        IgnoreUnresolvedVariables: "true"
+        Source: request
+        Header:
+          - metadata:
+              name: Authorization
+            Pattern:
+              metadata:
+                ignoreCase: "true"
+              value: "Bearer {flow.bearer_token}"
+  - name: JS-PrepareJwtVerify
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-PrepareJwtVerify
+          timeLimit: "200"
+        ResourceURL: jsc://prepare-jwt-verify.js
+  - name: RF-MissingAuth
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-MissingAuth
+        FaultResponse:
+          Set:
+            StatusCode: 401
+            ReasonPhrase: Unauthorized
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"unauthorized","message":"Missing Authorization Bearer JWT token"}'
+  - name: KVM-GetSecurityKeys
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetSecurityKeys
+          mapIdentifier: OIDC-Users
+        Scope: environment
+        Get:
+          - metadata:
+              assignTo: public.key
+            Key:
+              Parameter: "key:public_key"
+  - name: JWT-VerifyOIDCToken
+    type: VerifyJWT
+    content:
+      VerifyJWT:
+        metadata:
+          name: JWT-VerifyOIDCToken
+        Algorithm: RS256
+        IgnoreUnresolvedVariables: "false"
+        Source: flow.bearer_token
+        PublicKey:
+          Value:
+            metadata:
+              ref: public.key
+        Issuer:
+          metadata:
+            ref: flow.token_issuer
+        Audience:
+          metadata:
+            ref: flow.jwt_aud
+  - name: JS-CheckCustomerScope
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-CheckCustomerScope
+          timeLimit: "200"
+        ResourceURL: jsc://check-customer-scope.js
+  - name: RF-InsufficientCustomerScope
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-InsufficientCustomerScope
+        FaultResponse:
+          Set:
+            StatusCode: 403
+            ReasonPhrase: Forbidden
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"insufficient_scope","message":"Token missing required scope customer-viewer or customer-admin"}'
+resources:
+  - name: prepare-jwt-verify.js
+    type: jsc
+    content: |
+      var token = String(context.getVariable("flow.bearer_token") || "").trim();
+      if (!token) {
+        context.setVariable("flow.has_bearer_token", "false");
+      } else {
+        context.setVariable("flow.has_bearer_token", "true");
+        var host = context.getVariable("request.header.host") || "";
+        var proto = context.getVariable("client.scheme") || "https";
+        context.setVariable("flow.token_issuer", proto + "://" + host);
+        var aud = "";
+        var parts = token.split(".");
+        if (parts.length === 3) {
+          try {
+            var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            var b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+            var out = "";
+            for (var bc = 0, bs = 0, buffer, idx = 0; (buffer = b64.charAt(idx++)); ) {
+              var pos = chars.indexOf(buffer);
+              if (pos !== -1) {
+                bs = bc % 4 ? bs * 64 + pos : pos;
+                if (bc++ % 4) out += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+              }
+            }
+            var payload = JSON.parse(out);
+            if (Array.isArray(payload.aud)) {
+              aud = String(payload.aud[0] || "");
+            } else if (payload.aud) {
+              aud = String(payload.aud);
+            }
+          } catch (e) {}
+        }
+        context.setVariable("flow.jwt_aud", aud);
+      }
+  - name: check-customer-scope.js
+    type: jsc
+    content: |
+      var scpRaw = String(context.getVariable("jwt.JWT-VerifyOIDCToken.claim.scope") || "");
+      var scopes = scpRaw.split(/\s+/);
+      var hasScope = false;
+      for (var i = 0; i < scopes.length; i++) {
+        if (scopes[i] === "customer-admin" || scopes[i] === "customer-viewer") {
+          hasScope = true;
+          break;
+        }
+      }
+      context.setVariable("flow.has_customer_scope", hasScope ? "true" : "false");

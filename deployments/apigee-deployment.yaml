@@ -4,9 +4,37 @@ schemaVersion: 1.0.0
 name: antigravity-deployment
 type: deployment
 description: Enterprise AI Gateway deployment for Google Antigravity using REST-AI-Antigravity.
+kvms:
+  - name: AI-Demo
+    type: environment
+    values:
+      throttle-europe-west3: "false"
+      throttle-europe-west10: "false"
+      throttle-us-east1: "false"
+      stop-europe-west3: "false"
+      stop-europe-west10: "false"
+      stop-us-east1: "false"
+      stop-mcp: "false"
+      lite-model: "google/gemini-3.5-flash-lite"
+      medium-model: "google/gemini-4-hydrogen"
+      thinking-model: "google/gemini-4-neon"
+      lite-model-percent: "80"
+      medium-model-percent: "15"
+      thinking-model-percent: "5"
+      screen-prompt: "false"
+      mask-prompt: "false"
+      override-google--gemini-4-neon: "google/gemini-4-hydrogen"
+      override-google--gemini-4-carbon: "google/gemini-4-hydrogen"
+      PriceList: '{"default":{"requestPerMillionTokens":1,"responsePerMillionTokens":3},"google/gemini-3.5-flash-lite":{"requestPerMillionTokens":0.1,"responsePerMillionTokens":0.4},"google/gemini-4-hydrogen":{"requestPerMillionTokens":1.25,"responsePerMillionTokens":5},"google/gemini-4-neon":{"requestPerMillionTokens":2.5,"responsePerMillionTokens":10},"google/gemini-4-carbon":{"requestPerMillionTokens":1.25,"responsePerMillionTokens":5}}'
 templates:
   - REST-AI-Antigravity.yaml
   - REST-AI-Messages.yaml
+proxies:
+  - ai-platform-router.yaml
+  - ai-platform-multi-region.yaml
+  - ai-kvm-config.yaml
+  - customers-a2a-v1.yaml
+  - customers-mcp-v1.yaml
 products:
   - name: coding-agent-product
     displayName: Coding Agent Product
@@ -21,6 +49,9 @@ products:
     proxies:
       - REST-AI-Antigravity
       - REST-AI-Messages
+      - ai-platform-router
+      - ai-platform-multi-region
+      - ai-kvm-config
     quota: "100000"
     quotaInterval: "1"
     quotaTimeUnit: month
@@ -99,5 +130,5 @@ products:
             llmTokenQuota:
               limit: "1000"
               interval: "5"
-              timeUnit: "minutes"
+              timeUnit: "minute"
 users: []

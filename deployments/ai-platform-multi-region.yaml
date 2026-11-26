@@ -1,0 +1,358 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/apigee/apigee-templater/main/schema/gateway.schema.1.0.json
+gateway: apigee
+schemaVersion: 1.0.0
+name: ai-platform-multi-region
+displayName: AI Platform Multi-Region Proxy
+type: proxy
+description: Proxies Vertex AI OpenAPI endpoints in europe-west3 and europe-west10 with KVM-controlled 429 throttling and 404 stop flags
+categories:
+  - ai
+  - vertex-ai
+endpoints:
+  - name: europe-west3
+    basePath: /aiplatform/europe-west3/v1
+    routes:
+      - name: europe-west3
+        target: europe-west3
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-PrepareJwtVerify
+          - name: RF-MissingAuth
+            condition: flow.has_bearer_token != "true"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+          - name: JS-CheckModelAccessScope
+          - name: RF-InsufficientModelScope
+            condition: flow.has_model_access != "true"
+          - name: KVM-GetWest3Flags
+          - name: RF-RegionStopped
+            condition: flow.stop = "true"
+          - name: RF-RegionThrottled
+            condition: flow.throttle = "true"
+  - name: europe-west10
+    basePath: /aiplatform/europe-west10/v1
+    routes:
+      - name: europe-west10
+        target: europe-west10
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-PrepareJwtVerify
+          - name: RF-MissingAuth
+            condition: flow.has_bearer_token != "true"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+          - name: JS-CheckModelAccessScope
+          - name: RF-InsufficientModelScope
+            condition: flow.has_model_access != "true"
+          - name: KVM-GetWest10Flags
+          - name: RF-RegionStopped
+            condition: flow.stop = "true"
+          - name: RF-RegionThrottled
+            condition: flow.throttle = "true"
+  - name: us-east1
+    basePath: /aiplatform/us-east1/v1
+    routes:
+      - name: us-east1
+        target: us-east1
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-PrepareJwtVerify
+          - name: RF-MissingAuth
+            condition: flow.has_bearer_token != "true"
+          - name: KVM-GetSecurityKeys
+          - name: JWT-VerifyOIDCToken
+          - name: JS-CheckModelAccessScope
+          - name: RF-InsufficientModelScope
+            condition: flow.has_model_access != "true"
+          - name: KVM-GetEast1Flags
+          - name: RF-RegionStopped
+            condition: flow.stop = "true"
+          - name: RF-RegionThrottled
+            condition: flow.throttle = "true"
+targets:
+  - name: europe-west3
+    httpTargetConnection:
+      URL: https://aiplatform.googleapis.com/v1/projects/{organization.name}/locations/europe-west3/endpoints/openapi
+      Authentication:
+        GoogleAccessToken:
+          Scopes:
+            - Scope: https://www.googleapis.com/auth/cloud-platform
+  - name: europe-west10
+    httpTargetConnection:
+      URL: https://aiplatform.googleapis.com/v1/projects/{organization.name}/locations/europe-west10/endpoints/openapi
+      Authentication:
+        GoogleAccessToken:
+          Scopes:
+            - Scope: https://www.googleapis.com/auth/cloud-platform
+  - name: us-east1
+    httpTargetConnection:
+      URL: https://aiplatform.googleapis.com/v1/projects/{organization.name}/locations/us-east1/endpoints/openapi
+      Authentication:
+        GoogleAccessToken:
+          Scopes:
+            - Scope: https://www.googleapis.com/auth/cloud-platform
+policies:
+  - name: CORS-AllowAll
+    type: CORS
+    content:
+      CORS:
+        metadata:
+          name: CORS-AllowAll
+        AllowOrigins: "*"
+        AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        AllowHeaders: "*"
+        ExposeHeaders: "*"
+        MaxAge: "3600"
+        AllowCredentials: "false"
+        GeneratePreflightResponse: "true"
+  - name: KVM-GetWest3Flags
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetWest3Flags
+          mapIdentifier: AI-Demo
+        ExpiryTimeInSecs: "1"
+        Get:
+          - metadata:
+              assignTo: flow.throttle
+            Key:
+              Parameter: throttle-europe-west3
+          - metadata:
+              assignTo: flow.stop
+            Key:
+              Parameter: stop-europe-west3
+  - name: KVM-GetWest10Flags
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetWest10Flags
+          mapIdentifier: AI-Demo
+        ExpiryTimeInSecs: "1"
+        Get:
+          - metadata:
+              assignTo: flow.throttle
+            Key:
+              Parameter: throttle-europe-west10
+          - metadata:
+              assignTo: flow.stop
+            Key:
+              Parameter: stop-europe-west10
+  - name: KVM-GetEast1Flags
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetEast1Flags
+          mapIdentifier: AI-Demo
+        ExpiryTimeInSecs: "1"
+        Get:
+          - metadata:
+              assignTo: flow.throttle
+            Key:
+              Parameter: throttle-us-east1
+          - metadata:
+              assignTo: flow.stop
+            Key:
+              Parameter: stop-us-east1
+  - name: RF-RegionThrottled
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-RegionThrottled
+        FaultResponse:
+          Set:
+            StatusCode: 429
+            ReasonPhrase: Too Many Requests
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"Too Many Requests","message":"Region is currently throttled via AI-Demo KVM"}'
+  - name: RF-RegionStopped
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-RegionStopped
+        FaultResponse:
+          Set:
+            StatusCode: 404
+            ReasonPhrase: Not Found
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"Not Found","message":"Region is currently stopped via AI-Demo KVM"}'
+  - name: EV-ExtractBearerKey
+    type: ExtractVariables
+    content:
+      ExtractVariables:
+        metadata:
+          name: EV-ExtractBearerKey
+        IgnoreUnresolvedVariables: "true"
+        Source: request
+        Header:
+          - metadata:
+              name: Authorization
+            Pattern:
+              metadata:
+                ignoreCase: "true"
+              value: "Bearer {flow.bearer_token}"
+  - name: JS-PrepareJwtVerify
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-PrepareJwtVerify
+          timeLimit: "200"
+        ResourceURL: jsc://prepare-jwt-verify.js
+  - name: RF-MissingAuth
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-MissingAuth
+        FaultResponse:
+          Set:
+            StatusCode: 401
+            ReasonPhrase: Unauthorized
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"unauthorized","message":"Missing Authorization Bearer JWT token"}'
+  - name: KVM-GetSecurityKeys
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetSecurityKeys
+          mapIdentifier: OIDC-Users
+        Scope: environment
+        Get:
+          - metadata:
+              assignTo: public.key
+            Key:
+              Parameter: "key:public_key"
+  - name: JWT-VerifyOIDCToken
+    type: VerifyJWT
+    content:
+      VerifyJWT:
+        metadata:
+          name: JWT-VerifyOIDCToken
+        Algorithm: RS256
+        IgnoreUnresolvedVariables: "false"
+        Source: flow.bearer_token
+        PublicKey:
+          Value:
+            metadata:
+              ref: public.key
+        Issuer:
+          metadata:
+            ref: flow.token_issuer
+        Audience:
+          metadata:
+            ref: flow.jwt_aud
+  - name: JS-CheckModelAccessScope
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-CheckModelAccessScope
+          timeLimit: "200"
+        ResourceURL: jsc://check-model-access-scope.js
+  - name: RF-InsufficientModelScope
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-InsufficientModelScope
+        FaultResponse:
+          Set:
+            StatusCode: 403
+            ReasonPhrase: Forbidden
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"insufficient_scope","message":"Token missing required scope model-access"}'
+resources:
+  - name: prepare-jwt-verify.js
+    type: jsc
+    content: |
+      var token = String(context.getVariable("flow.bearer_token") || "").trim();
+      if (!token) {
+        context.setVariable("flow.has_bearer_token", "false");
+      } else {
+        context.setVariable("flow.has_bearer_token", "true");
+        var host = context.getVariable("request.header.host") || "";
+        var proto = context.getVariable("client.scheme") || "https";
+        context.setVariable("flow.token_issuer", proto + "://" + host);
+        var aud = "";
+        var parts = token.split(".");
+        if (parts.length === 3) {
+          try {
+            var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            var b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+            var out = "";
+            for (var bc = 0, bs = 0, buffer, idx = 0; (buffer = b64.charAt(idx++)); ) {
+              var pos = chars.indexOf(buffer);
+              if (pos !== -1) {
+                bs = bc % 4 ? bs * 64 + pos : pos;
+                if (bc++ % 4) out += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+              }
+            }
+            var payload = JSON.parse(out);
+            if (Array.isArray(payload.aud)) {
+              aud = String(payload.aud[0] || "");
+            } else if (payload.aud) {
+              aud = String(payload.aud);
+            }
+          } catch (e) {}
+        }
+        context.setVariable("flow.jwt_aud", aud);
+      }
+  - name: check-model-access-scope.js
+    type: jsc
+    content: |
+      var scopeRaw = String(context.getVariable("jwt.JWT-VerifyOIDCToken.claim.scope") || "");
+      var scopes = scopeRaw.split(/\s+/);
+      var hasModelAccess = false;
+      for (var i = 0; i < scopes.length; i++) {
+        if (scopes[i] === "model-access") {
+          hasModelAccess = true;
+          break;
+        }
+      }
+      context.setVariable("flow.has_model_access", hasModelAccess ? "true" : "false");
