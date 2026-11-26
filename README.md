@@ -1,4 +1,4 @@
-# Apigee AI Demos
+# Apigee AI Journeys
 
 Browser-based `xrdp` workstation portal authenticated via **Google Cloud IAP** (or `?user=test@example.com` for direct testing), built on **Bun** and **IronRDP (WebAssembly)**.
 
