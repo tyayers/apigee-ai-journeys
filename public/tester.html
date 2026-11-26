@@ -367,7 +367,7 @@
     <aside aria-label="Primary sections">
       <div class="nav-tabs" role="tablist" aria-orientation="vertical">
         <button id="tab-welcome" class="nav-tab" role="tab" type="button" aria-selected="true" aria-controls="panel-welcome">1. Welcome</button>
-        <button id="tab-token" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-token">2. Token &amp; Configuration</button>
+        <button id="tab-token" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-token">2. Token &amp; Config</button>
         <button id="tab-router" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-router">3. Test AI Router</button>
         <button id="tab-a2amcp" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-a2amcp">4. Test A2A / MCP</button>
         <button id="tab-agent" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-agent">5. Example Agent (A2A)</button>
@@ -423,7 +423,7 @@
         </details>
 
         <div class="panel-footer">
-          <button type="button" class="primary" data-next-tab="tab-token">Next: Token &amp; Configuration →</button>
+          <button type="button" class="primary" data-next-tab="tab-token">Next: Token &amp; Config →</button>
         </div>
       </section>
 
@@ -593,7 +593,7 @@
       <!-- Tab 2: Test AI Router -->
       <section id="panel-router" class="panel" role="tabpanel" aria-labelledby="tab-router" hidden>
         <h2>Test AI Router</h2>
-        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Configuration tab first.</div>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
           Calls <code>ai-platform-router</code> with your token &amp; prompt configuration.
         </p>
@@ -601,9 +601,10 @@
           <strong>Suggested Use Cases to Test:</strong>
           <ul style="margin: 0.4rem 0 0; padding-left: 1.25rem;">
             <li><strong>Regional Routing:</strong> Try a basic <code>eu</code>, <code>us</code>, or <code>global</code> endpoint request.</li>
-            <li><strong>Health-Aware Failover:</strong> Throttle or stop a region in <em>Token &amp; Configuration → AI-Demo KVM Properties</em> and watch traffic load-balance to healthy regions via <code>307</code> redirects.</li>
+            <li><strong>Health-Aware Failover:</strong> Throttle or stop a region in <em>Token &amp; Config → AI-Demo KVM Properties</em> and watch traffic load-balance to healthy regions via <code>307</code> redirects.</li>
             <li><strong>Data Residency:</strong> Check <code>x-data-classification: true</code> and target <code>us</code> / <code>us-east1</code> (blocked with <code>503</code>) vs. <code>eu</code> / <code>europe-west3</code> / <code>europe-west10</code> (allowed).</li>
-            <li><strong>Prompt Security &amp; Smart Routing:</strong> Toggle <code>x-screen-prompt: true</code> (Model Armor), <code>x-mask-prompt: true</code> (DLP PII masking), or select <code>smart</code> model routing.</li>
+            <li><strong>Prompt Security:</strong> Toggle <code>x-screen-prompt: true</code> (Model Armor) or <code>x-mask-prompt: true</code> (DLP PII masking).</li>
+            <li><strong>Smart Router &amp; Proportions:</strong> Select <code>smart</code> as the model to route prompts by complexity, and adjust <code>lite-model-percent</code> / <code>medium-model-percent</code> / <code>thinking-model-percent</code> in <em>Token &amp; Config → AI-Demo KVM Properties</em>.</li>
           </ul>
         </div>
         <form id="modelForm" action="#" method="POST">
@@ -673,7 +674,7 @@
       <!-- Tab 4: Test A2A / MCP -->
       <section id="panel-a2amcp" class="panel" role="tabpanel" aria-labelledby="tab-a2amcp" hidden>
         <h2>Test Customer A2A &amp; MCP</h2>
-        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Configuration tab first.</div>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
           Tests <code>customers-a2a-v1</code> and <code>customers-mcp-v1</code> with your configured API key.
         </p>
@@ -724,7 +725,7 @@
           <button id="newChatBtn" type="button">New Chat</button>
         </div>
 
-        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Configuration tab first.</div>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
 
         <div class="grid-2">
           <div class="field">
@@ -1003,7 +1004,7 @@
       const token = getAccessToken();
       if (!token) {
         if (statusEl) {
-          statusEl.textContent = "✕ Please obtain an access token on the Token &amp; Configuration tab first.";
+          statusEl.textContent = "✕ Please obtain an access token on the Token &amp; Config tab first.";
           statusEl.className = "status err";
         }
         activateTab("tab-token");
@@ -1710,7 +1711,7 @@
       e.preventDefault();
       const key = getAccessToken();
       if (!key) {
-        appendChatMessage("err", "Error", "Please obtain an access token on the Token &amp; Configuration tab first.");
+        appendChatMessage("err", "Error", "Please obtain an access token on the Token &amp; Config tab first.");
         return;
       }
 
