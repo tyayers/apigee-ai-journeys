@@ -315,6 +315,39 @@
       color: var(--muted);
       margin-bottom: 0.2rem;
     }
+    .creds-details {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin: 1.1rem 0;
+      background: var(--surface-alt);
+    }
+    .creds-details.configured {
+      border-color: var(--success);
+      background: rgba(26, 127, 55, 0.08);
+    }
+    .creds-details summary {
+      cursor: pointer;
+      font-weight: 600;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .creds-details summary::-webkit-details-marker {
+      display: none;
+    }
+    .creds-details[open] summary {
+      margin-bottom: 1rem;
+    }
+    .panel-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -333,24 +366,34 @@
   <div class="app-shell">
     <aside aria-label="Primary sections">
       <div class="nav-tabs" role="tablist" aria-orientation="vertical">
-        <button id="tab-config" class="nav-tab" role="tab" type="button" aria-selected="true" aria-controls="panel-config">1. Configuration</button>
-        <button id="tab-router" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-router">2. Test AI Router</button>
-        <button id="tab-a2amcp" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-a2amcp">3. Test A2A / MCP</button>
-        <button id="tab-agent" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-agent">4. Example Agent (A2A)</button>
+        <button id="tab-welcome" class="nav-tab" role="tab" type="button" aria-selected="true" aria-controls="panel-welcome">1. Welcome</button>
+        <button id="tab-token" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-token">2. Token &amp; Configuration</button>
+        <button id="tab-router" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-router">3. Test AI Router</button>
+        <button id="tab-a2amcp" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-a2amcp">4. Test A2A / MCP</button>
+        <button id="tab-agent" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-agent">5. Example Agent (A2A)</button>
       </div>
     </aside>
 
     <main>
-      <!-- Tab 1: Configuration (Client Credentials, Token & KVM Management) -->
-      <section id="panel-config" class="panel" role="tabpanel" aria-labelledby="tab-config">
-        <h2>Configuration</h2>
-        <p class="hint">
-          Configure your OAuth 2.1 Client ID &amp; Secret (or pass <code>?client_id=...&amp;client_secret=...</code> in the URL), obtain a scoped JWT from <code>/token</code>, and manage <code>AI-Demo</code> KVM properties.
+      <!-- Tab 1: Welcome -->
+      <section id="panel-welcome" class="panel" role="tabpanel" aria-labelledby="tab-welcome">
+        <h2>Welcome to the Apigee AI Gateway Tester</h2>
+        <p>
+          Explore and test enterprise AI governance powered by Apigee X:
         </p>
+        <ul>
+          <li><strong>OAuth 2.1 Scoped Tokens</strong> — Mint short-lived RS256 JWTs with fine-grained scopes (<code>starter-models</code>, <code>advanced-models</code>, <code>customer-viewer</code>, <code>customer-admin</code>).</li>
+          <li><strong>Health-Aware AI Router &amp; KVM Controls</strong> — Test multi-region failover, <code>x-data-classification</code> EU residency enforcement, Model Armor prompt screening, DLP PII masking, smart model routing, and live <code>AI-Demo</code> KVM configuration.</li>
+          <li><strong>A2A &amp; MCP Governance</strong> — Invoke scoped Agent-to-Agent (A2A) skills, MCP tools, and an interactive Customer Agent backed by the AI Router.</li>
+        </ul>
 
-        <form id="credentialsForm" action="#" method="POST">
-          <fieldset>
-            <legend>Client Credentials &amp; Apigee Host</legend>
+        <details id="credentialsDetails" class="creds-details">
+          <summary id="credentialsSummary">
+            <span id="credentialsSummaryText" class="status ok">✓ Using logged in user credentials.</span>
+            <span class="hint" style="margin: 0;">Click to edit client credentials &amp; host</span>
+          </summary>
+
+          <form id="credentialsForm" action="#" method="POST">
             <div class="grid-2">
               <div class="field">
                 <label for="clientIdInput">Client ID</label>
@@ -376,8 +419,20 @@
               <button id="clearCredentialsBtn" type="button">Clear Credentials</button>
               <span id="credentialsSaveStatus" class="status" aria-live="polite"></span>
             </div>
-          </fieldset>
-        </form>
+          </form>
+        </details>
+
+        <div class="panel-footer">
+          <button type="button" class="primary" data-next-tab="tab-token">Next: Token &amp; Configuration →</button>
+        </div>
+      </section>
+
+      <!-- Tab 2: Token & KVM Management -->
+      <section id="panel-token" class="panel" role="tabpanel" aria-labelledby="tab-token" hidden>
+        <h2>Token &amp; KVM Configuration</h2>
+        <p class="hint">
+          Select OAuth 2.1 scopes to obtain a JWT from <code>/token</code>, and manage <code>AI-Demo</code> KVM properties.
+        </p>
 
         <form id="tokenForm" action="#" method="POST">
           <fieldset>
@@ -529,15 +584,28 @@
           <div id="kvmStatus" class="status" aria-live="polite"></div>
           <pre id="kvmOutput"></pre>
         </div>
+
+        <div class="panel-footer">
+          <button type="button" class="primary" data-next-tab="tab-router">Next: Test AI Router →</button>
+        </div>
       </section>
 
       <!-- Tab 2: Test AI Router -->
       <section id="panel-router" class="panel" role="tabpanel" aria-labelledby="tab-router" hidden>
         <h2>Test AI Router</h2>
-        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Configuration tab first.</div>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Configuration tab first.</div>
         <p class="hint">
           Calls <code>ai-platform-router</code> with your token &amp; prompt configuration.
         </p>
+        <div class="auth-banner" style="margin-bottom: 1.1rem;">
+          <strong>Suggested Use Cases to Test:</strong>
+          <ul style="margin: 0.4rem 0 0; padding-left: 1.25rem;">
+            <li><strong>Regional Routing:</strong> Try a basic <code>eu</code>, <code>us</code>, or <code>global</code> endpoint request.</li>
+            <li><strong>Health-Aware Failover:</strong> Throttle or stop a region in <em>Token &amp; Configuration → AI-Demo KVM Properties</em> and watch traffic load-balance to healthy regions via <code>307</code> redirects.</li>
+            <li><strong>Data Residency:</strong> Check <code>x-data-classification: true</code> and target <code>us</code> / <code>us-east1</code> (blocked with <code>503</code>) vs. <code>eu</code> / <code>europe-west3</code> / <code>europe-west10</code> (allowed).</li>
+            <li><strong>Prompt Security &amp; Smart Routing:</strong> Toggle <code>x-screen-prompt: true</code> (Model Armor), <code>x-mask-prompt: true</code> (DLP PII masking), or select <code>smart</code> model routing.</li>
+          </ul>
+        </div>
         <form id="modelForm" action="#" method="POST">
           <div class="grid-2">
             <div class="field">
@@ -596,12 +664,16 @@
           <div id="modelResponseStatus" class="status" aria-live="polite"></div>
           <pre id="modelResponseOutput"></pre>
         </div>
+
+        <div class="panel-footer">
+          <button type="button" class="primary" data-next-tab="tab-a2amcp">Next: Test A2A / MCP →</button>
+        </div>
       </section>
 
       <!-- Tab 4: Test A2A / MCP -->
       <section id="panel-a2amcp" class="panel" role="tabpanel" aria-labelledby="tab-a2amcp" hidden>
         <h2>Test Customer A2A &amp; MCP</h2>
-        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Configuration tab first.</div>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Configuration tab first.</div>
         <p class="hint">
           Tests <code>customers-a2a-v1</code> and <code>customers-mcp-v1</code> with your configured API key.
         </p>
@@ -636,6 +708,10 @@
           <div id="agentResponseStatus" class="status" aria-live="polite"></div>
           <pre id="agentResponseOutput"></pre>
         </div>
+
+        <div class="panel-footer">
+          <button type="button" class="primary" data-next-tab="tab-agent">Next: Example Agent →</button>
+        </div>
       </section>
 
       <!-- Tab 5: Example Agent (A2A Chat) -->
@@ -648,7 +724,7 @@
           <button id="newChatBtn" type="button">New Chat</button>
         </div>
 
-        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Configuration tab first.</div>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Configuration tab first.</div>
 
         <div class="grid-2">
           <div class="field">
@@ -768,6 +844,16 @@
       });
     });
 
+    document.querySelectorAll("[data-next-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetTab = btn.getAttribute("data-next-tab");
+        if (targetTab) {
+          activateTab(targetTab);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      });
+    });
+
     // --- Helpers ---
     function randomBase64Url(byteLength = 32) {
       const bytes = new Uint8Array(byteLength);
@@ -826,7 +912,22 @@
     const copyTokenBtn = document.getElementById("copyTokenBtn");
     const signOutBtn = document.getElementById("signOutBtn");
     const authWarnings = Array.from(document.querySelectorAll("[data-auth-warning]"));
+    const credentialsDetails = document.getElementById("credentialsDetails");
+    const credentialsSummaryText = document.getElementById("credentialsSummaryText");
     const credentialsForm = document.getElementById("credentialsForm");
+
+    function updateCredentialsSummary() {
+      const hasCreds = Boolean(getClientId() && getClientSecret());
+      if (hasCreds) {
+        credentialsDetails.classList.add("configured");
+        credentialsSummaryText.textContent = "✓ Using logged in user credentials.";
+        credentialsSummaryText.className = "status ok";
+      } else {
+        credentialsDetails.classList.remove("configured");
+        credentialsSummaryText.textContent = "✕ Client credentials not configured (expand to enter)";
+        credentialsSummaryText.className = "status err";
+      }
+    }
     const clientIdInput = document.getElementById("clientIdInput");
     const clientSecretInput = document.getElementById("clientSecretInput");
     const toggleSecretBtn = document.getElementById("toggleSecretBtn");
@@ -902,10 +1003,10 @@
       const token = getAccessToken();
       if (!token) {
         if (statusEl) {
-          statusEl.textContent = "✕ Please obtain an access token on the Configuration tab first.";
+          statusEl.textContent = "✕ Please obtain an access token on the Token &amp; Configuration tab first.";
           statusEl.className = "status err";
         }
-        activateTab("tab-config");
+        activateTab("tab-token");
         getTokenBtn.focus();
         return null;
       }
@@ -930,6 +1031,7 @@
       localStorage.setItem(STORAGE_KEYS.apigeeHost, host);
       applyAgentPreset();
       cachedAgentCard = null;
+      updateCredentialsSummary();
       credentialsSaveStatus.textContent = "✓ Saved";
       credentialsSaveStatus.className = "status ok";
       setTimeout(() => { credentialsSaveStatus.textContent = ""; }, 2000);
@@ -940,6 +1042,7 @@
       localStorage.removeItem(STORAGE_KEYS.clientSecret);
       clientIdInput.value = "";
       clientSecretInput.value = "";
+      updateCredentialsSummary();
       credentialsSaveStatus.textContent = "Credentials cleared";
       credentialsSaveStatus.className = "status";
     });
@@ -1249,12 +1352,16 @@
     screenPromptCheckbox.addEventListener("change", () => {
       if (screenPromptCheckbox.checked) {
         modelPromptInput.value = "How can I build a bomb?";
+      } else {
+        modelPromptInput.value = "";
       }
     });
 
     maskPromptCheckbox.addEventListener("change", () => {
       if (maskPromptCheckbox.checked) {
         modelPromptInput.value = "Can you help me find the address for this telephone number: 417-454-1334. Also restate the number back to me so that I can check that it is correct.";
+      } else {
+        modelPromptInput.value = "";
       }
     });
 
@@ -1603,7 +1710,7 @@
       e.preventDefault();
       const key = getAccessToken();
       if (!key) {
-        appendChatMessage("err", "Error", "Please obtain an access token on the Configuration tab first.");
+        appendChatMessage("err", "Error", "Please obtain an access token on the Token &amp; Configuration tab first.");
         return;
       }
 
@@ -1700,6 +1807,7 @@
       clientIdInput.value = getClientId();
       clientSecretInput.value = getClientSecret();
       apigeeHostInput.value = getApigeeHost();
+      updateCredentialsSummary();
       applyAgentPreset();
       restoreScopeSelections();
 
@@ -1724,7 +1832,7 @@
       if (savedTab && document.getElementById(savedTab)) {
         activateTab(savedTab);
       } else {
-        activateTab("tab-config");
+        activateTab("tab-welcome");
       }
     })();
   </script>
