@@ -2009,7 +2009,7 @@ if [[ -n "${PORTAL_HOST:-}" ]]; then
   } | write_user_file "$DESKTOP_DIR/apigee-portal.desktop" 0644 || true
 fi
 
-TESTER_BASE_URL="${ON_CONNECT_TESTER_URL:-https://apigee-ai-journeys.ai-gtw.net/tester.html}"
+TESTER_BASE_URL="${ON_CONNECT_TESTER_URL:-http://localhost:8080/tester.html}"
 TESTER_CLIENT_ID="${ON_CONNECT_USER_CLIENT_ID:-${ON_CONNECT_USER_ANTIGRAVITY_KEY:-}}"
 TESTER_CLIENT_SECRET="${ON_CONNECT_USER_CLIENT_SECRET:-}"
 TESTER_SHORTCUT_URL="$TESTER_BASE_URL"

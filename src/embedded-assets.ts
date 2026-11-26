@@ -1,4 +1,5 @@
 import indexHtml from "../public/index.html" with { type: "file" };
+import testerHtml from "../public/tester.html" with { type: "file" };
 import stylesCss from "../public/styles.css" with { type: "file" };
 import appJs from "../public/app.js" with { type: "file" };
 import rdpViewerJs from "../public/rdp-viewer.js" with { type: "file" };
@@ -19,6 +20,7 @@ export const EMBEDDED_CLAUDE_DESKTOP_SETTINGS_JSON: string = claudeDesktopSettin
 
 export const EMBEDDED_PUBLIC_FILES: Record<string, { filePath: string; contentType: string }> = {
   "/index.html": { filePath: indexHtml, contentType: "text/html; charset=utf-8" },
+  "/tester.html": { filePath: testerHtml, contentType: "text/html; charset=utf-8" },
   "/styles.css": { filePath: stylesCss, contentType: "text/css; charset=utf-8" },
   "/app.js": { filePath: appJs, contentType: "application/javascript; charset=utf-8" },
   "/rdp-viewer.js": { filePath: rdpViewerJs, contentType: "application/javascript; charset=utf-8" },

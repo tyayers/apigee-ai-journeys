@@ -194,6 +194,14 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     const html = await res.text();
     expect(html).toContain("<title>Desktop Session</title>");
     expect(html).toContain('<span class="topbar-brand-text">Desktop Session</span>');
+
+    for (const testerRoute of ["/tester", "/tester.html"]) {
+      const testerRes = await fetch(`${baseUrl}${testerRoute}`);
+      expect(testerRes.status).toBe(200);
+      const testerHtml = await testerRes.text();
+      expect(testerHtml).toContain("<title>Apigee AI Gateway Tester</title>");
+      expect(testerRes.headers.get("content-security-policy")).toContain("connect-src 'self' https: http: ws: wss:");
+    }
     expect(html).toContain('href="/favicon.svg"');
     const favRes = await fetch(`${baseUrl}/favicon.svg`);
     expect(favRes.status).toBe(200);
@@ -1523,7 +1531,7 @@ mkdir -p "${userHome}/.vscode-oss/extensions/google.google-antigravity-1.12.0"
           "utf8"
         )
       );
-      const expectedTesterUrl = `https://apigee-ai-journeys.ai-gtw.net/tester.html?client_id=${encodeURIComponent(existingRes!.apiKey)}`;
+      const expectedTesterUrl = `http://localhost:8080/tester.html?client_id=${encodeURIComponent(existingRes!.apiKey)}`;
       expect(chromePrefs.session).toEqual({
         restore_on_startup: 4,
         startup_urls: [

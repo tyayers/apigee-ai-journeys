@@ -376,6 +376,31 @@ export function createAppServer(
 
         // Serve index.html for "/" and "/desktop" (also establishing cookie when ?user=... or IAP header is present)
         if (req.method === "GET" || req.method === "HEAD") {
+          if (pathname === "/tester" || pathname === "/tester.html") {
+            const diskTester = Bun.file(path.join(config.publicDir, "tester.html"));
+            const testerFile =
+              !config.isCompiledBinary && (await diskTester.exists())
+                ? diskTester
+                : Bun.file(EMBEDDED_PUBLIC_FILES["/tester.html"]!.filePath);
+            const headers = new Headers({
+              "Content-Type": "text/html; charset=utf-8",
+              "Cache-Control": "no-store",
+              "X-Content-Type-Options": "nosniff",
+              "X-Frame-Options": "SAMEORIGIN",
+              "Referrer-Policy": "strict-origin-when-cross-origin",
+              "Content-Security-Policy": [
+                "default-src 'self'",
+                "script-src 'self' 'unsafe-inline'",
+                "style-src 'self' 'unsafe-inline'",
+                "img-src 'self' data: blob:",
+                "connect-src 'self' https: http: ws: wss:",
+                "frame-ancestors 'self'",
+                "base-uri 'none'",
+              ].join("; "),
+            });
+            return new Response(req.method === "HEAD" ? null : testerFile, { status: 200, headers });
+          }
+
           if (pathname === "/" || pathname === "/desktop") {
             const nonce = crypto.randomBytes(16).toString("base64");
             const diskIndex = Bun.file(path.join(config.publicDir, "index.html"));
