@@ -25,13 +25,13 @@ kvms:
       mask-prompt: "false"
       override-google--gemini-4-neon: "google/gemini-4-hydrogen"
       override-google--gemini-4-carbon: "google/gemini-4-hydrogen"
-      PriceList: '{"default":{"requestPerMillionTokens":1,"responsePerMillionTokens":3},"google/gemini-3.5-flash-lite":{"requestPerMillionTokens":0.1,"responsePerMillionTokens":0.4},"google/gemini-4-hydrogen":{"requestPerMillionTokens":1.25,"responsePerMillionTokens":5},"google/gemini-4-neon":{"requestPerMillionTokens":2.5,"responsePerMillionTokens":10},"google/gemini-4-carbon":{"requestPerMillionTokens":1.25,"responsePerMillionTokens":5}}'
-templates:
-  - REST-AI-Antigravity.yaml
-  - REST-AI-Messages.yaml
+      PriceList: '{"default":{"requestPerMillionTokens":1,"responsePerMillionTokens":3,"cachedPerMillionTokens":0.1},"google/gemini-4-hydrogen":{"requestPerMillionTokens":1.5,"responsePerMillionTokens":7.5,"cachedPerMillionTokens":0.075},"google/gemini-4-neon":{"requestPerMillionTokens":3.0,"responsePerMillionTokens":15.0,"cachedPerMillionTokens":0.15},"google/gemini-4-carbon":{"requestPerMillionTokens":2.0,"responsePerMillionTokens":10.0,"cachedPerMillionTokens":0.1},"google/gemini-4-argon":{"requestPerMillionTokens":2.0,"responsePerMillionTokens":10.0,"cachedPerMillionTokens":0.1},"anthropic/claude-opus-5-5":{"requestPerMillionTokens":4.0,"responsePerMillionTokens":20.0,"cachedPerMillionTokens":0.2,"cacheWritePerMillionTokens":5.0},"anthropic/claude-sonnet-5-5":{"requestPerMillionTokens":2.0,"responsePerMillionTokens":10.0,"cachedPerMillionTokens":0.1,"cacheWritePerMillionTokens":2.5},"anthropic/claude-haiku-5-5":{"requestPerMillionTokens":0.1,"responsePerMillionTokens":0.5,"cachedPerMillionTokens":0.01,"cacheWritePerMillionTokens":0.125}}'
+templates: []
 proxies:
   - ai-platform-router.yaml
   - ai-platform-multi-region.yaml
+  - ai-platform-antigravity.yaml
+  - ai-platform-claude.yaml
   - ai-kvm-config.yaml
   - customers-a2a-v1.yaml
   - customers-mcp-v1.yaml
@@ -51,6 +51,8 @@ products:
       - REST-AI-Messages
       - ai-platform-router
       - ai-platform-multi-region
+      - ai-platform-antigravity
+      - ai-platform-claude
       - ai-kvm-config
     quota: "100000"
     quotaInterval: "1"
@@ -64,7 +66,7 @@ products:
               - POST
             model: claude-sonnet-5-5
             llmTokenQuota:
-              limit: "222222"
+              limit: "200000"
               interval: "1"
               timeUnit: day
       - apiSource: REST-AI-Messages
@@ -74,7 +76,7 @@ products:
               - POST
             model: claude-opus-5-5
             llmTokenQuota:
-              limit: "222222"
+              limit: "200000"
               interval: "1"
               timeUnit: day
       - apiSource: REST-AI-Messages
@@ -98,7 +100,7 @@ products:
               - POST
             model: gemini-4-carbon
             llmTokenQuota:
-              limit: "222222"
+              limit: "200000"
               interval: "1"
               timeUnit: day
       - apiSource: REST-AI-Antigravity
@@ -108,7 +110,7 @@ products:
               - POST
             model: gemini-4-neon
             llmTokenQuota:
-              limit: "222222"
+              limit: "200000"
               interval: "1"
               timeUnit: day
       - apiSource: REST-AI-Antigravity
@@ -118,7 +120,7 @@ products:
               - POST
             model: gemini-4-hydrogen
             llmTokenQuota:
-              limit: "222222"
+              limit: "200000"
               interval: "1"
               timeUnit: day
       - apiSource: REST-AI-Antigravity

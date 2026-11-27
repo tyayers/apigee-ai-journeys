@@ -1800,7 +1800,16 @@ resources:
       }
 
       function extractUsageData(contentString) {
-        var usageData = { model: "", requestTokenCount: 0, responseTokenCount: 0, totalTokenCount: 0, usageFound: false };
+        var usageData = {
+          model: "",
+          requestTokenCount: 0,
+          nonCachedRequestTokenCount: 0,
+          cachedReadTokenCount: 0,
+          cacheWriteTokenCount: 0,
+          responseTokenCount: 0,
+          totalTokenCount: 0,
+          usageFound: false
+        };
         if (!contentString) return usageData;
         var cleaned = typeof contentString === "string" ? contentString.trim() : "";
         if (!cleaned && typeof contentString === "object") {
@@ -1829,10 +1838,38 @@ resources:
           if (d.modelVersion) usageData.model = d.modelVersion;
           if (d.message && d.message.model) usageData.model = d.message.model;
 
-          if (d.usage && d.usage.prompt_tokens !== undefined) usageData.requestTokenCount = d.usage.prompt_tokens;
-          if (d.message && d.message.usage && d.message.usage.input_tokens !== undefined) usageData.requestTokenCount = d.message.usage.input_tokens;
-          if (d.usage && d.usage.input_tokens !== undefined) usageData.requestTokenCount = d.usage.input_tokens;
-          if (d.usageMetadata && d.usageMetadata.promptTokenCount !== undefined) usageData.requestTokenCount = d.usageMetadata.promptTokenCount;
+          if (d.usage && d.usage.prompt_tokens !== undefined) {
+            var oaiPrompt = d.usage.prompt_tokens || 0;
+            var oaiCached = (d.usage.prompt_tokens_details && d.usage.prompt_tokens_details.cached_tokens) || 0;
+            usageData.cachedReadTokenCount = oaiCached;
+            usageData.nonCachedRequestTokenCount = Math.max(0, oaiPrompt - oaiCached);
+            usageData.requestTokenCount = oaiPrompt;
+          }
+          if (d.message && d.message.usage && d.message.usage.input_tokens !== undefined) {
+            var msgIn = d.message.usage.input_tokens || 0;
+            var msgCacheRead = d.message.usage.cache_read_input_tokens || 0;
+            var msgCacheWrite = d.message.usage.cache_creation_input_tokens || 0;
+            usageData.nonCachedRequestTokenCount = msgIn;
+            usageData.cachedReadTokenCount = msgCacheRead;
+            usageData.cacheWriteTokenCount = msgCacheWrite;
+            usageData.requestTokenCount = msgIn + msgCacheRead + msgCacheWrite;
+          }
+          if (d.usage && d.usage.input_tokens !== undefined) {
+            var uIn = d.usage.input_tokens || 0;
+            var uCacheRead = d.usage.cache_read_input_tokens || 0;
+            var uCacheWrite = d.usage.cache_creation_input_tokens || 0;
+            usageData.nonCachedRequestTokenCount = uIn;
+            usageData.cachedReadTokenCount = uCacheRead;
+            usageData.cacheWriteTokenCount = uCacheWrite;
+            usageData.requestTokenCount = uIn + uCacheRead + uCacheWrite;
+          }
+          if (d.usageMetadata && d.usageMetadata.promptTokenCount !== undefined) {
+            var gPrompt = d.usageMetadata.promptTokenCount || 0;
+            var gCached = d.usageMetadata.cachedContentTokenCount || 0;
+            usageData.cachedReadTokenCount = gCached;
+            usageData.nonCachedRequestTokenCount = Math.max(0, gPrompt - gCached);
+            usageData.requestTokenCount = gPrompt;
+          }
 
           if (d.usage && d.usage.completion_tokens !== undefined) usageData.responseTokenCount = d.usage.completion_tokens;
           if (d.message && d.message.usage && d.message.usage.output_tokens !== undefined) usageData.responseTokenCount = d.message.usage.output_tokens;
@@ -1863,7 +1900,7 @@ resources:
 
       var prices = safeJsonParse(context.getVariable("ai.prices"));
       if (!prices || !prices["default"]) {
-        prices = { "default": { "requestPerMillionTokens": 1, "responsePerMillionTokens": 3 } };
+        prices = { "default": { "requestPerMillionTokens": 1, "responsePerMillionTokens": 3, "cachedPerMillionTokens": 0.1 } };
       }
       context.setVariable("ai.responseType", type);
 
@@ -1877,12 +1914,14 @@ resources:
       var existingReqTokenCount = context.getVariable("ai.requestTokenCount");
       if (existingReqTokenCount && !usageData.requestTokenCount) {
         usageData.requestTokenCount = parseInt(existingReqTokenCount, 10) || 0;
+        usageData.nonCachedRequestTokenCount = usageData.requestTokenCount;
       }
 
       if (usageData.usageFound) {
         context.setVariable("ai.usageDataFound", "true");
         context.setVariable("ai.promptTokenCount", String(usageData.requestTokenCount));
         context.setVariable("ai.requestTokenCount", String(usageData.requestTokenCount));
+        context.setVariable("ai.cachedTokenCount", String(usageData.cachedReadTokenCount));
         context.setVariable("ai.responseTokenCount", String(usageData.responseTokenCount));
         usageData.totalTokenCount = usageData.requestTokenCount + usageData.responseTokenCount;
         context.setVariable("ai.totalTokenCount", String(usageData.totalTokenCount));
@@ -1903,10 +1942,15 @@ resources:
         context.setVariable("ai.costCenter", String(costCenter));
 
         var cleanModel = modelName.indexOf("/") !== -1 ? modelName.split("/").pop() : modelName;
-        var priceEntry = prices[modelName] || prices[cleanModel] || prices["default"];
+        var priceEntry = prices[modelName] || prices[cleanModel] || prices["google/" + cleanModel] || prices["anthropic/" + cleanModel] || prices["default"];
         var reqPrice = parseFloat(priceEntry.requestPerMillionTokens) || 0;
+        var cachedPrice = priceEntry.cachedPerMillionTokens !== undefined ? (parseFloat(priceEntry.cachedPerMillionTokens) || 0) : (reqPrice * 0.1);
+        var cacheWritePrice = priceEntry.cacheWritePerMillionTokens !== undefined ? (parseFloat(priceEntry.cacheWritePerMillionTokens) || 0) : (reqPrice * 1.25);
         var respPrice = parseFloat(priceEntry.responsePerMillionTokens) || 0;
-        var reqCost = parseFloat(usageData.requestTokenCount) * (reqPrice / 1000000);
+
+        var reqCost = (parseFloat(usageData.nonCachedRequestTokenCount) * (reqPrice / 1000000)) +
+                      (parseFloat(usageData.cachedReadTokenCount) * (cachedPrice / 1000000)) +
+                      (parseFloat(usageData.cacheWriteTokenCount) * (cacheWritePrice / 1000000));
         var respCost = parseFloat(usageData.responseTokenCount) * (respPrice / 1000000);
 
         context.setVariable("ai.requestCost", String(reqCost));

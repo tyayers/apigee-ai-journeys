@@ -231,8 +231,41 @@
       border-color: var(--accent);
       color: #ffffff;
     }
-    button.primary:hover { background: var(--accent-hover); }
+    button.primary:hover:not(:disabled) { background: var(--accent-hover); }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .tooltip-anchor {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+    .tooltip-bubble {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.45rem 0.7rem;
+      border-radius: 6px;
+      background: var(--text);
+      color: var(--surface);
+      font-size: 0.8rem;
+      font-weight: 500;
+      line-height: 1.3;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.15s ease, visibility 0.15s ease;
+      z-index: 20;
+    }
+    .tooltip-anchor:has(button:disabled):not(.tooltip-dismissed):hover .tooltip-bubble,
+    .tooltip-anchor:has(button:disabled):not(.tooltip-dismissed):focus-visible .tooltip-bubble,
+    .tooltip-anchor:has(button:disabled):not(.tooltip-dismissed):focus-within .tooltip-bubble,
+    .tooltip-bubble:hover {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
     :focus-visible {
       outline: 3px solid var(--accent);
       outline-offset: 2px;
@@ -348,6 +381,91 @@
       padding-top: 1rem;
       border-top: 1px solid var(--border);
     }
+    .cli-instructions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .cli-card {
+      padding: 0.9rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--code-bg);
+    }
+    .cli-card h3 {
+      margin: 0 0 0.45rem;
+      font-size: 0.95rem;
+    }
+    .cli-card p {
+      margin: 0.35rem 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .cli-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-bottom: 0.75rem;
+    }
+    .cli-presets button {
+      padding: 0.3rem 0.65rem;
+      font-size: 0.8rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .terminal-box {
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.84rem;
+      overflow: hidden;
+    }
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.45rem 0.8rem;
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 0.78rem;
+    }
+    .terminal-output {
+      padding: 0.85rem;
+      min-height: 220px;
+      max-height: 360px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.45;
+    }
+    .terminal-line-cmd { color: #38bdf8; }
+    .terminal-line-ok { color: #4ade80; }
+    .terminal-line-muted { color: #94a3b8; }
+    .terminal-line-err { color: #f87171; }
+    .terminal-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.8rem;
+      border-top: 1px solid #1e293b;
+      background: #0b1120;
+    }
+    .terminal-prompt {
+      color: #4ade80;
+      font-weight: 700;
+      user-select: none;
+    }
+    .terminal-input-row input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: #f8fafc;
+      font: inherit;
+      padding: 0.25rem 0;
+      outline: none;
+    }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -369,8 +487,10 @@
         <button id="tab-welcome" class="nav-tab" role="tab" type="button" aria-selected="true" aria-controls="panel-welcome">1. Welcome</button>
         <button id="tab-token" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-token">2. Token &amp; Config</button>
         <button id="tab-router" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-router">3. Test AI Router</button>
-        <button id="tab-a2amcp" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-a2amcp">4. Test A2A / MCP</button>
-        <button id="tab-agent" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-agent">5. Example Agent (A2A)</button>
+        <button id="tab-antigravity" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-antigravity">4. Test Antigravity</button>
+        <button id="tab-claude" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-claude">5. Test Claude Code</button>
+        <button id="tab-a2amcp" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-a2amcp">6. Test A2A / MCP</button>
+        <button id="tab-agent" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-agent">7. Example Agent (A2A)</button>
       </div>
     </aside>
 
@@ -473,6 +593,10 @@
             </div>
             <div class="row">
               <button id="getTokenBtn" type="submit" class="primary">Get Access Token</button>
+              <span id="nextRouterWrap" class="tooltip-anchor" tabindex="0">
+                <button id="nextRouterBtn" type="button" class="primary" data-next-tab="tab-router" disabled aria-describedby="nextRouterTooltip">Next: Test AI Router →</button>
+                <span id="nextRouterTooltip" role="tooltip" class="tooltip-bubble">You need an access token to proceed.</span>
+              </span>
               <span id="tokenStatus" class="status" aria-live="polite"></span>
             </div>
             <div id="tokenSection" hidden style="margin-top: 1rem;">
@@ -584,10 +708,6 @@
           <div id="kvmStatus" class="status" aria-live="polite"></div>
           <pre id="kvmOutput"></pre>
         </div>
-
-        <div class="panel-footer">
-          <button type="button" class="primary" data-next-tab="tab-router">Next: Test AI Router →</button>
-        </div>
       </section>
 
       <!-- Tab 2: Test AI Router -->
@@ -667,11 +787,123 @@
         </div>
 
         <div class="panel-footer">
+          <button type="button" class="primary" data-next-tab="tab-antigravity">Next: Test Antigravity →</button>
+        </div>
+      </section>
+
+      <!-- Tab 4: Test Antigravity -->
+      <section id="panel-antigravity" class="panel" role="tabpanel" aria-labelledby="tab-antigravity" hidden>
+        <h2>Test Antigravity</h2>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
+        <p class="hint">
+          Launch Google Antigravity from the desktop or terminal via <code>ai-platform-antigravity</code> (<code>/antigravity</code>), or try the interactive CLI simulator below.
+        </p>
+
+        <div class="cli-instructions">
+          <div class="cli-card">
+            <h3>Terminal (<code>agy</code>)</h3>
+            <p>Open a terminal in your workspace and start an interactive session or one-shot prompt:</p>
+            <pre>agy
+agy "Explain the Apigee AI gateway"</pre>
+            <p>Reads gateway URL &amp; credentials from <code>~/.antigravity/settings.json</code> or <code>/etc/antigravity/admin_settings.json</code>.</p>
+          </div>
+          <div class="cli-card">
+            <h3>Desktop / IDE</h3>
+            <p>Launch <strong>Antigravity</strong> from the Desktop shortcut or <strong>Applications → Development → Antigravity</strong> (or run <code>antigravity</code> in a terminal).</p>
+            <p>Enterprise gateway routing to <code>/antigravity</code> is pre-configured for all VM users.</p>
+          </div>
+        </div>
+
+        <div class="row" style="justify-content: space-between; margin-bottom: 0.65rem;">
+          <label class="radio-option" style="margin: 0;">
+            <input type="checkbox" id="agyLiveMode">
+            Send prompts to live <code>/antigravity</code> Apigee proxy
+          </label>
+          <button id="agyClearBtn" type="button">Clear Terminal</button>
+        </div>
+
+        <div class="cli-presets" aria-label="Antigravity CLI presets">
+          <button type="button" data-cli-target="agy" data-cli-cmd="agy --version">agy --version</button>
+          <button type="button" data-cli-target="agy" data-cli-cmd="/status">/status</button>
+          <button type="button" data-cli-target="agy" data-cli-cmd="/model gemini-4-hydrogen">/model gemini-4-hydrogen</button>
+          <button type="button" data-cli-target="agy" data-cli-cmd='agy "Respond with PONG."'>agy "Respond with PONG."</button>
+        </div>
+
+        <div class="terminal-box">
+          <div class="terminal-bar">
+            <span>antigravity-cli (agy) — simulated terminal</span>
+            <span id="agyModelBadge">model: gemini-4-hydrogen</span>
+          </div>
+          <div id="agyOutput" class="terminal-output" aria-live="polite"></div>
+          <form id="agyForm" class="terminal-input-row" action="#" method="POST">
+            <span class="terminal-prompt" aria-hidden="true">$</span>
+            <input id="agyInput" type="text" placeholder="Type a command (e.g. /help, /status, agy &quot;hello&quot;)..." autocomplete="off">
+            <button type="submit" class="primary">Run</button>
+          </form>
+        </div>
+
+        <div class="panel-footer">
+          <button type="button" class="primary" data-next-tab="tab-claude">Next: Test Claude Code →</button>
+        </div>
+      </section>
+
+      <!-- Tab 5: Test Claude Code -->
+      <section id="panel-claude" class="panel" role="tabpanel" aria-labelledby="tab-claude" hidden>
+        <h2>Test Claude Code</h2>
+        <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
+        <p class="hint">
+          Launch Claude Code from the terminal or desktop via <code>ai-platform-claude</code> (<code>/claude</code>), or try the interactive CLI simulator below.
+        </p>
+
+        <div class="cli-instructions">
+          <div class="cli-card">
+            <h3>Terminal (<code>claude</code>)</h3>
+            <p>Open a terminal in your project and start Claude Code interactively or in print mode:</p>
+            <pre>claude
+claude -p "Summarize recent changes"</pre>
+            <p>Uses <code>ANTHROPIC_BASE_URL</code> in <code>~/.claude/settings.json</code> or <code>/etc/claude-code/managed-settings.json</code>.</p>
+          </div>
+          <div class="cli-card">
+            <h3>Desktop</h3>
+            <p>Launch <strong>Claude</strong> from the Desktop shortcut or <strong>Applications → Development → Claude</strong>.</p>
+            <p>Managed enterprise settings route Vertex AI Anthropic requests through Apigee <code>/claude</code>.</p>
+          </div>
+        </div>
+
+        <div class="row" style="justify-content: space-between; margin-bottom: 0.65rem;">
+          <label class="radio-option" style="margin: 0;">
+            <input type="checkbox" id="claudeLiveMode">
+            Send prompts to live <code>/claude</code> Apigee proxy
+          </label>
+          <button id="claudeClearBtn" type="button">Clear Terminal</button>
+        </div>
+
+        <div class="cli-presets" aria-label="Claude Code CLI presets">
+          <button type="button" data-cli-target="claude" data-cli-cmd="claude --version">claude --version</button>
+          <button type="button" data-cli-target="claude" data-cli-cmd="/status">/status</button>
+          <button type="button" data-cli-target="claude" data-cli-cmd="/model claude-sonnet-5-5">/model claude-sonnet-5-5</button>
+          <button type="button" data-cli-target="claude" data-cli-cmd='claude -p "Respond with PONG."'>claude -p "Respond with PONG."</button>
+        </div>
+
+        <div class="terminal-box">
+          <div class="terminal-bar">
+            <span>claude-code (claude) — simulated terminal</span>
+            <span id="claudeModelBadge">model: claude-sonnet-5-5</span>
+          </div>
+          <div id="claudeOutput" class="terminal-output" aria-live="polite"></div>
+          <form id="claudeForm" class="terminal-input-row" action="#" method="POST">
+            <span class="terminal-prompt" aria-hidden="true">&gt;</span>
+            <input id="claudeInput" type="text" placeholder="Type a command (e.g. /help, /status, claude -p &quot;hello&quot;)..." autocomplete="off">
+            <button type="submit" class="primary">Run</button>
+          </form>
+        </div>
+
+        <div class="panel-footer">
           <button type="button" class="primary" data-next-tab="tab-a2amcp">Next: Test A2A / MCP →</button>
         </div>
       </section>
 
-      <!-- Tab 4: Test A2A / MCP -->
+      <!-- Tab 6: Test A2A / MCP -->
       <section id="panel-a2amcp" class="panel" role="tabpanel" aria-labelledby="tab-a2amcp" hidden>
         <h2>Test Customer A2A &amp; MCP</h2>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
@@ -715,7 +947,7 @@
         </div>
       </section>
 
-      <!-- Tab 5: Example Agent (A2A Chat) -->
+      <!-- Tab 7: Example Agent (A2A Chat) -->
       <section id="panel-agent" class="panel" role="tabpanel" aria-labelledby="tab-agent" hidden>
         <div class="row" style="justify-content: space-between; margin-bottom: 0.75rem;">
           <div>
@@ -938,6 +1170,9 @@
     const tokenForm = document.getElementById("tokenForm");
     const extraScopesInput = document.getElementById("extraScopes");
     const getTokenBtn = document.getElementById("getTokenBtn");
+    const nextRouterWrap = document.getElementById("nextRouterWrap");
+    const nextRouterBtn = document.getElementById("nextRouterBtn");
+    const nextRouterTooltip = document.getElementById("nextRouterTooltip");
     const tokenStatus = document.getElementById("tokenStatus");
     const tokenSection = document.getElementById("tokenSection");
     const tokenClaims = document.getElementById("tokenClaims");
@@ -998,6 +1233,32 @@
         tokenClaims.textContent = "";
       }
       authWarnings.forEach((el) => { el.hidden = hasToken; });
+      if (nextRouterBtn) {
+        nextRouterBtn.disabled = !hasToken;
+        if (hasToken) {
+          nextRouterBtn.removeAttribute("aria-describedby");
+          if (nextRouterWrap) nextRouterWrap.removeAttribute("tabindex");
+          if (nextRouterTooltip) nextRouterTooltip.hidden = true;
+        } else {
+          nextRouterBtn.setAttribute("aria-describedby", "nextRouterTooltip");
+          if (nextRouterWrap) nextRouterWrap.setAttribute("tabindex", "0");
+          if (nextRouterTooltip) nextRouterTooltip.hidden = false;
+        }
+      }
+    }
+
+    if (nextRouterWrap) {
+      nextRouterWrap.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          nextRouterWrap.classList.add("tooltip-dismissed");
+        }
+      });
+      nextRouterWrap.addEventListener("mouseleave", () => {
+        nextRouterWrap.classList.remove("tooltip-dismissed");
+      });
+      nextRouterWrap.addEventListener("blur", () => {
+        nextRouterWrap.classList.remove("tooltip-dismissed");
+      });
     }
 
     function requireAccessToken(statusEl) {
@@ -1767,6 +2028,215 @@
       } finally {
         sendChatBtn.disabled = false;
       }
+    });
+
+    // --- Tab 4 & 5: Antigravity & Claude Code CLI Simulators ---
+    function createCliSimulator(config) {
+      const outputEl = document.getElementById(config.outputId);
+      const formEl = document.getElementById(config.formId);
+      const inputEl = document.getElementById(config.inputId);
+      const clearBtn = document.getElementById(config.clearBtnId);
+      const liveCheckbox = document.getElementById(config.liveId);
+      const modelBadge = document.getElementById(config.badgeId);
+      let currentModel = config.defaultModel;
+
+      function appendLine(text, cls) {
+        const div = document.createElement("div");
+        if (cls) div.className = cls;
+        div.textContent = text;
+        outputEl.appendChild(div);
+        outputEl.scrollTop = outputEl.scrollHeight;
+      }
+
+      function printBanner() {
+        appendLine(config.banner, "terminal-line-muted");
+        appendLine("Type /help for available commands, or enter a prompt.", "terminal-line-muted");
+      }
+
+      function extractPrompt(raw) {
+        let cmd = raw.trim();
+        if (cmd.startsWith(config.bin + " ")) {
+          cmd = cmd.slice(config.bin.length + 1).trim();
+        }
+        if (cmd.startsWith("-p ")) {
+          cmd = cmd.slice(3).trim();
+        }
+        if ((cmd.startsWith('"') && cmd.endsWith('"')) || (cmd.startsWith("'") && cmd.endsWith("'"))) {
+          cmd = cmd.slice(1, -1);
+        }
+        return cmd;
+      }
+
+      async function runCommand(raw) {
+        const trimmed = raw.trim();
+        if (!trimmed) return;
+        appendLine(`${config.promptChar} ${trimmed}`, "terminal-line-cmd");
+
+        if (trimmed === "clear" || trimmed === "/clear") {
+          outputEl.textContent = "";
+          printBanner();
+          return;
+        }
+        if (trimmed === "/help" || trimmed === `${config.bin} --help`) {
+          appendLine(
+            `Commands:\n  ${config.bin} --version       Show CLI version\n  /status                Show gateway URL, token & active model\n  /model <name>          Switch active model\n  /clear                 Clear terminal output\n  <prompt>               Run a prompt (simulated or live via ${config.proxyPath})`,
+            "terminal-line-muted"
+          );
+          return;
+        }
+        if (trimmed === `${config.bin} --version`) {
+          appendLine(config.versionText, "terminal-line-ok");
+          return;
+        }
+        if (trimmed === "/status") {
+          const token = getAccessToken();
+          appendLine(
+            `Gateway: ${getApigeeHost()}${config.proxyPath}\nModel:   ${currentModel}\nAuth:    ${token ? "Bearer token active" : "No token (configure in Step 2)"}\nMode:    ${liveCheckbox.checked ? "Live Apigee proxy" : "Simulated local CLI"}`,
+            "terminal-line-ok"
+          );
+          return;
+        }
+        if (trimmed.startsWith("/model")) {
+          const nextModel = trimmed.slice(6).trim();
+          if (!nextModel) {
+            appendLine(`Current model: ${currentModel}`, "terminal-line-muted");
+          } else {
+            currentModel = nextModel;
+            modelBadge.textContent = `model: ${currentModel}`;
+            appendLine(`✓ Switched model to ${currentModel}`, "terminal-line-ok");
+          }
+          return;
+        }
+
+        const promptText = extractPrompt(trimmed);
+        if (liveCheckbox.checked) {
+          const token = getAccessToken();
+          if (!token) {
+            appendLine("✕ No access token found. Get a token in Step 2 (Token & Config) first.", "terminal-line-err");
+            return;
+          }
+          appendLine(`[${config.bin}] Sending request to ${getApigeeHost()}${config.proxyPath} (${currentModel})...`, "terminal-line-muted");
+          try {
+            const res = await config.sendLive(getApigeeHost(), token, currentModel, promptText);
+            if (!res.ok) {
+              appendLine(`✕ HTTP ${res.status}: ${res.text}`, "terminal-line-err");
+            } else {
+              appendLine(res.text, "terminal-line-ok");
+            }
+          } catch (err) {
+            appendLine(`✕ Request failed: ${err.message}`, "terminal-line-err");
+          }
+        } else {
+          appendLine(`[simulated ${config.bin} • ${currentModel}]`, "terminal-line-muted");
+          appendLine(config.simulateReply(promptText, currentModel), "terminal-line-ok");
+        }
+      }
+
+      formEl.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const cmd = inputEl.value;
+        inputEl.value = "";
+        await runCommand(cmd);
+      });
+
+      clearBtn.addEventListener("click", () => {
+        outputEl.textContent = "";
+        printBanner();
+      });
+
+      printBanner();
+      return { runCommand };
+    }
+
+    const agySim = createCliSimulator({
+      bin: "agy",
+      promptChar: "$",
+      outputId: "agyOutput",
+      formId: "agyForm",
+      inputId: "agyInput",
+      clearBtnId: "agyClearBtn",
+      liveId: "agyLiveMode",
+      badgeId: "agyModelBadge",
+      defaultModel: "gemini-4-hydrogen",
+      proxyPath: "/antigravity",
+      banner: "Antigravity CLI v2.4.0 — Apigee Enterprise Gateway (/antigravity)",
+      versionText: "antigravity-cli 2.4.0 (gateway: /antigravity)",
+      simulateReply: (prompt, model) =>
+        prompt.toLowerCase().includes("pong")
+          ? "PONG"
+          : `Analyzed "${prompt}" using ${model} via Apigee /antigravity (GoogleAccessToken + LLMTokenQuota).`,
+      sendLive: async (host, token, model, prompt) => {
+        const url = `${host}/antigravity/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
+        });
+        const raw = await resp.text();
+        if (!resp.ok) return { ok: false, status: resp.status, text: raw };
+        try {
+          const data = JSON.parse(raw);
+          const reply = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || raw;
+          return { ok: true, status: resp.status, text: reply };
+        } catch (_) {
+          return { ok: true, status: resp.status, text: raw };
+        }
+      }
+    });
+
+    const claudeSim = createCliSimulator({
+      bin: "claude",
+      promptChar: ">",
+      outputId: "claudeOutput",
+      formId: "claudeForm",
+      inputId: "claudeInput",
+      clearBtnId: "claudeClearBtn",
+      liveId: "claudeLiveMode",
+      badgeId: "claudeModelBadge",
+      defaultModel: "claude-sonnet-5-5",
+      proxyPath: "/claude",
+      banner: "Claude Code CLI v2.1.0 — Apigee Enterprise Gateway (/claude)",
+      versionText: "claude-code 2.1.0 (Vertex AI via /claude)",
+      simulateReply: (prompt, model) =>
+        prompt.toLowerCase().includes("pong")
+          ? "PONG"
+          : `Processed "${prompt}" with ${model} via Apigee /claude (Vertex AI rawPredict + token cost analytics).`,
+      sendLive: async (host, token, model, prompt) => {
+        const url = `${host}/claude/projects/default/locations/global/publishers/anthropic/models/${encodeURIComponent(model)}:rawPredict`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            anthropic_version: "vertex-2023-10-16",
+            max_tokens: 512,
+            messages: [{ role: "user", content: prompt }]
+          })
+        });
+        const raw = await resp.text();
+        if (!resp.ok) return { ok: false, status: resp.status, text: raw };
+        try {
+          const data = JSON.parse(raw);
+          const reply = data?.content?.map((c) => c.text || "").join("") || raw;
+          return { ok: true, status: resp.status, text: reply };
+        } catch (_) {
+          return { ok: true, status: resp.status, text: raw };
+        }
+      }
+    });
+
+    document.querySelectorAll("[data-cli-target]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.getAttribute("data-cli-target");
+        const cmd = btn.getAttribute("data-cli-cmd") || "";
+        if (target === "agy") agySim.runCommand(cmd);
+        if (target === "claude") claudeSim.runCommand(cmd);
+      });
     });
 
     // Initialize on page load

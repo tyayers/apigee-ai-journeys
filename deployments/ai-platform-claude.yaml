@@ -1,0 +1,758 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/apigee/apigee-templater/main/schema/gateway.schema.1.0.json
+gateway: apigee
+schemaVersion: 1.0.0
+name: ai-platform-claude
+displayName: AI Platform Claude Proxy
+type: proxy
+description: Proxies Vertex AI Anthropic (/claude/projects/...) requests to aiplatform.googleapis.com in project {organization.name} with API key/OIDC auth, LLM token quota, and cost analytics using GoogleAccessToken
+categories:
+  - ai
+  - vertex-ai
+  - claude
+endpoints:
+  - name: default
+    basePath: /claude
+    routes:
+      - name: default
+        target: default
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: CORS-AllowAll
+          - name: EV-ExtractBearerKey
+          - name: JS-DetectAuthType
+          - name: RF-MissingAuth
+            condition: flow.auth_type = "none"
+          - name: VA-VerifyKey
+            condition: flow.auth_type = "apikey"
+          - name: JS-ExtractModelName
+          - name: JS-ValidateQuotaModel
+            condition: (flow.auth_type = "apikey") and (ai.model != null)
+          - name: RF-ModelNotAllowed
+            condition: (flow.auth_type = "apikey") and (flow.model_not_allowed = "true")
+          - name: LTQ-QuotaEnforce
+            condition: (flow.auth_type = "apikey") and (ai.modelTokenLimit != null)
+          - name: KVM-GetSecurityKeys
+            condition: flow.auth_type = "jwt"
+          - name: JWT-VerifyOIDCToken
+            condition: flow.auth_type = "jwt"
+          - name: JS-CheckModelScope
+            condition: flow.auth_type = "jwt"
+          - name: RF-InsufficientModelScope
+            condition: (flow.auth_type = "jwt") and (flow.has_valid_model_scope != "true")
+          - name: KVM-GetPriceList
+      - name: PostFlow
+        mode: Response
+        steps:
+          - name: JS-Analytics
+            condition: response.content != ""
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+    defaultFaultRule:
+      name: DefaultFaultRule
+      alwaysEnforce: "true"
+      steps:
+        - name: AM-QuotaExhaustion
+          condition: fault.name = "LLMTokenQuotaViolation"
+targets:
+  - name: default
+    httpTargetConnection:
+      Properties:
+        Property:
+          metadata:
+            name: io.timeout.millis
+          _text: "600000"
+      URL: https://aiplatform.googleapis.com/v1
+      Authentication:
+        GoogleAccessToken:
+          Scopes:
+            - Scope: https://www.googleapis.com/auth/cloud-platform
+    flows:
+      - name: PreFlow
+        mode: Request
+        steps:
+          - name: JS-SetTargetUrl
+      - name: EventFlow
+        mode: Response
+        steps:
+          - name: JS-Analytics
+          - name: LTQ-QuotaCount
+            condition: (flow.auth_type = "apikey") and (verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.limit != null) and (ai.totalTokenCount != null)
+          - name: DC-TokenAnalytics
+            condition: ai.usageDataFound = "true"
+          - name: JS-ResetUsageDataFound
+            condition: ai.usageDataFound = "true"
+policies:
+  - name: CORS-AllowAll
+    type: CORS
+    content:
+      CORS:
+        metadata:
+          name: CORS-AllowAll
+        AllowOrigins: "*"
+        AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        AllowHeaders: "*"
+        ExposeHeaders: "*"
+        MaxAge: "3600"
+        AllowCredentials: "false"
+        GeneratePreflightResponse: "true"
+  - name: EV-ExtractBearerKey
+    type: ExtractVariables
+    content:
+      ExtractVariables:
+        metadata:
+          name: EV-ExtractBearerKey
+        IgnoreUnresolvedVariables: "true"
+        Source: request
+        Header:
+          - metadata:
+              name: Authorization
+            Pattern:
+              metadata:
+                ignoreCase: "true"
+              value: "Bearer {flow.bearer_token}"
+  - name: JS-DetectAuthType
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-DetectAuthType
+          timeLimit: "200"
+        ResourceURL: jsc://detect-auth-type.js
+  - name: RF-MissingAuth
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-MissingAuth
+        FaultResponse:
+          Set:
+            StatusCode: 401
+            ReasonPhrase: Unauthorized
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"unauthorized","message":"Missing Authorization Bearer token or API key"}'
+  - name: VA-VerifyKey
+    type: VerifyAPIKey
+    content:
+      VerifyAPIKey:
+        metadata:
+          name: VA-VerifyKey
+        APIKey:
+          metadata:
+            ref: flow.api_key
+  - name: JS-ExtractModelName
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ExtractModelName
+          timeLimit: "200"
+        ResourceURL: jsc://extract-model-name.js
+  - name: JS-ValidateQuotaModel
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ValidateQuotaModel
+          timeLimit: "200"
+        ResourceURL: jsc://validate-quota-model.js
+  - name: RF-ModelNotAllowed
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-ModelNotAllowed
+        FaultResponse:
+          Set:
+            StatusCode: 403
+            ReasonPhrase: Forbidden
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"forbidden","message":"Model not allowed by API product"}'
+  - name: LTQ-QuotaEnforce
+    type: LLMTokenQuota
+    content:
+      LLMTokenQuota:
+        metadata:
+          continueOnError: "false"
+          enabled: "true"
+          name: LTQ-QuotaEnforce
+          type: calendar
+        DisplayName: LTQ-QuotaEnforce
+        Properties: {}
+        UseQuotaConfigInAPIProduct:
+          metadata:
+            stepName: VA-VerifyKey
+        EnforceOnly: "true"
+        SharedName: llm-quota
+        Distributed: "false"
+        Synchronous: "false"
+        StartTime: 2013-08-21 10:00:00
+        AsynchronousConfiguration:
+          SyncIntervalInSeconds: "20"
+          SyncMessageCount: "5"
+        LLMModelSource: "{ai.model}"
+  - name: LTQ-QuotaCount
+    type: LLMTokenQuota
+    content:
+      LLMTokenQuota:
+        metadata:
+          continueOnError: "false"
+          enabled: "true"
+          name: LTQ-QuotaCount
+          type: calendar
+        DisplayName: LTQ-QuotaCount
+        Properties: {}
+        UseQuotaConfigInAPIProduct:
+          metadata:
+            stepName: VA-VerifyKey
+        CountOnly: "true"
+        SharedName: llm-quota
+        Distributed: "false"
+        Synchronous: "false"
+        StartTime: 2013-08-21 10:00:00
+        AsynchronousConfiguration:
+          SyncIntervalInSeconds: "20"
+          SyncMessageCount: "5"
+        LLMTokenUsageSource: "{ai.totalTokenCount}"
+        LLMModelSource: "{ai.model}"
+  - name: AM-QuotaExhaustion
+    type: AssignMessage
+    content:
+      AssignMessage:
+        metadata:
+          name: AM-QuotaExhaustion
+        Set:
+          StatusCode: 429
+          ReasonPhrase: Too Many Requests
+          Headers:
+            - Header:
+                metadata:
+                  name: Content-Type
+                value: application/json
+          Payload:
+            metadata:
+              contentType: application/json
+            value: '{"error":"quota_exhausted","message":"LLM token quota exhausted"}'
+        AssignTo:
+          metadata:
+            createNew: "false"
+            transport: http
+            type: response
+  - name: KVM-GetSecurityKeys
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetSecurityKeys
+          mapIdentifier: OIDC-Users
+        Scope: environment
+        Get:
+          - metadata:
+              assignTo: public.key
+            Key:
+              Parameter: "key:public_key"
+  - name: JWT-VerifyOIDCToken
+    type: VerifyJWT
+    content:
+      VerifyJWT:
+        metadata:
+          name: JWT-VerifyOIDCToken
+        Algorithm: RS256
+        IgnoreUnresolvedVariables: "false"
+        Source: flow.bearer_token
+        PublicKey:
+          Value:
+            metadata:
+              ref: public.key
+        Issuer:
+          metadata:
+            ref: flow.token_issuer
+        Audience:
+          metadata:
+            ref: flow.jwt_aud
+  - name: JS-CheckModelScope
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-CheckModelScope
+          timeLimit: "200"
+        ResourceURL: jsc://check-model-scope.js
+  - name: RF-InsufficientModelScope
+    type: RaiseFault
+    content:
+      RaiseFault:
+        metadata:
+          name: RF-InsufficientModelScope
+        FaultResponse:
+          Set:
+            StatusCode: 403
+            ReasonPhrase: Forbidden
+            Headers:
+              - Header:
+                  metadata:
+                    name: Content-Type
+                  value: application/json
+            Payload:
+              metadata:
+                contentType: application/json
+              value: '{"error":"insufficient_scope","message":"Token missing starter-models or advanced-models scope"}'
+  - name: KVM-GetPriceList
+    type: KeyValueMapOperations
+    content:
+      KeyValueMapOperations:
+        metadata:
+          name: KVM-GetPriceList
+          mapIdentifier: AI-Demo
+        ExpiryTimeInSecs: "1"
+        Get:
+          - metadata:
+              assignTo: ai.prices
+            Key:
+              Parameter: PriceList
+  - name: JS-SetTargetUrl
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-SetTargetUrl
+          timeLimit: "200"
+        ResourceURL: jsc://set-target-url.js
+  - name: JS-Analytics
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-Analytics
+          timeLimit: "200"
+        ResourceURL: jsc://analytics.js
+  - name: JS-ResetUsageDataFound
+    type: Javascript
+    content:
+      Javascript:
+        metadata:
+          name: JS-ResetUsageDataFound
+          timeLimit: "200"
+        ResourceURL: jsc://reset-usage-data-found.js
+  - name: DC-TokenAnalytics
+    type: DataCapture
+    content:
+      DataCapture:
+        metadata:
+          name: DC-TokenAnalytics
+          continueOnError: "true"
+          enabled: "true"
+        DisplayName: DC-TokenAnalytics
+        IgnoreUnresolvedVariables: "true"
+        Capture:
+          - Collect:
+              metadata:
+                ref: ai.model
+                default: unknown
+            DataCollector: dc_ai_model
+          - Collect:
+              metadata:
+                ref: ai.promptTokenCount
+                default: "0"
+            DataCollector: dc_ai_prompt_token_count
+          - Collect:
+              metadata:
+                ref: ai.responseTokenCount
+                default: "0"
+            DataCollector: dc_ai_response_token_count
+          - Collect:
+              metadata:
+                ref: ai.totalTokenCount
+                default: "0"
+            DataCollector: dc_ai_total_token_count
+          - Collect:
+              metadata:
+                ref: ai.responseType
+                default: unknown
+            DataCollector: dc_ai_response_type
+          - Collect:
+              metadata:
+                ref: ai.timeToFirstToken
+                default: "0"
+            DataCollector: dc_ai_time_first_token
+          - Collect:
+              metadata:
+                ref: ai.costCenter
+                default: unknown
+            DataCollector: dc_ai_cost_center
+          - Collect:
+              metadata:
+                ref: ai.requestCost
+                default: "0"
+            DataCollector: dc_ai_request_cost
+          - Collect:
+              metadata:
+                ref: ai.responseCost
+                default: "0"
+            DataCollector: dc_ai_response_cost
+          - Collect:
+              metadata:
+                ref: ai.totalCost
+                default: "0"
+            DataCollector: dc_ai_total_cost
+resources:
+  - name: detect-auth-type.js
+    type: jsc
+    content: |
+      var bearerToken = String(context.getVariable("flow.bearer_token") || "").trim();
+      var xApiKey = String(context.getVariable("request.header.x-api-key") || "").trim();
+      var token = bearerToken || xApiKey;
+
+      var host = context.getVariable("request.header.host") || "";
+      var proto = context.getVariable("client.scheme") || "https";
+      context.setVariable("flow.token_issuer", proto + "://" + host);
+
+      if (!token) {
+        context.setVariable("flow.auth_type", "none");
+      } else {
+        var parts = token.split(".");
+        if (bearerToken && parts.length === 3) {
+          context.setVariable("flow.auth_type", "jwt");
+          var aud = "";
+          try {
+            var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            var b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+            var out = "";
+            for (var bc = 0, bs = 0, buffer, idx = 0; (buffer = b64.charAt(idx++)); ) {
+              var pos = chars.indexOf(buffer);
+              if (pos !== -1) {
+                bs = bc % 4 ? bs * 64 + pos : pos;
+                if (bc++ % 4) out += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+              }
+            }
+            var payload = JSON.parse(out);
+            if (Array.isArray(payload.aud)) {
+              aud = String(payload.aud[0] || "");
+            } else if (payload.aud) {
+              aud = String(payload.aud);
+            }
+          } catch (e) {}
+          context.setVariable("flow.jwt_aud", aud);
+        } else {
+          context.setVariable("flow.auth_type", "apikey");
+          context.setVariable("flow.api_key", token);
+        }
+      }
+  - name: check-model-scope.js
+    type: jsc
+    content: |
+      var scopeRaw = String(context.getVariable("jwt.JWT-VerifyOIDCToken.claim.scope") || "");
+      var scopes = scopeRaw.split(/\s+/);
+      var hasStarter = false;
+      var hasAdvanced = false;
+      var hasModelAccess = false;
+      for (var i = 0; i < scopes.length; i++) {
+        if (scopes[i] === "starter-models") hasStarter = true;
+        if (scopes[i] === "advanced-models") hasAdvanced = true;
+        if (scopes[i] === "model-access") hasModelAccess = true;
+      }
+
+      if (hasAdvanced || hasStarter || hasModelAccess) {
+        var sub = context.getVariable("jwt.JWT-VerifyOIDCToken.claim.subject") ||
+                  context.getVariable("flow.jwt_aud") ||
+                  "ai-platform-claude";
+        context.setVariable("flow.has_valid_model_scope", "true");
+        context.setVariable("flow.downstream_sub", String(sub));
+      } else {
+        context.setVariable("flow.has_valid_model_scope", "false");
+      }
+  - name: extract-model-name.js
+    type: jsc
+    content: |
+      var model = "";
+      var raw = context.getVariable("request.content");
+      if (raw) {
+        try {
+          var body = JSON.parse(raw);
+          if (body.model) {
+            model = String(body.model);
+          }
+        } catch (e) {}
+      }
+      if (!model) {
+        var suffix = String(context.getVariable("proxy.pathsuffix") || "");
+        var m = suffix.match(/\/models\/([^\/:]+)/);
+        if (m && m[1]) {
+          model = m[1];
+        }
+      }
+      if (model) {
+        context.setVariable("ai.model", model);
+      }
+  - name: validate-quota-model.js
+    type: jsc
+    content: |
+      var productContent = context.getVariable("verifyapikey.VA-VerifyKey.apiproduct.developer.llmQuota.filteredConfigs");
+      var modelName = String(context.getVariable("ai.model") || "").trim();
+      context.setVariable("flow.model_not_allowed", "false");
+
+      if (!modelName || !productContent) {
+        context.setVariable("flow.model_not_allowed", "true");
+      } else {
+        var cleanModel = modelName.indexOf("/") !== -1 ? modelName.split("/").pop() : modelName;
+        var data = productContent;
+        if (typeof productContent === "string") {
+          try { data = JSON.parse(productContent); } catch (e) { data = null; }
+        } else if (productContent && productContent.asJSON) {
+          data = productContent.asJSON;
+        }
+
+        var allowed = false;
+        var limit = -1;
+        if (Array.isArray(data)) {
+          for (var i = 0; i < data.length; i++) {
+            var entry = data[i];
+            if (entry && Array.isArray(entry.llmOperations)) {
+              for (var j = 0; j < entry.llmOperations.length; j++) {
+                var op = entry.llmOperations[j];
+                if (op && op.model) {
+                  var opModel = String(op.model);
+                  var cleanOpModel = opModel.indexOf("/") !== -1 ? opModel.split("/").pop() : opModel;
+                  if (opModel === modelName || cleanOpModel === cleanModel) {
+                    allowed = true;
+                    if (entry.llmTokenQuota && entry.llmTokenQuota.limit !== undefined && entry.llmTokenQuota.limit !== null && entry.llmTokenQuota.limit !== "") {
+                      limit = entry.llmTokenQuota.limit;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (!allowed) {
+          context.setVariable("flow.model_not_allowed", "true");
+        } else if (limit !== -1) {
+          context.setVariable("ai.modelTokenLimit", String(limit));
+        }
+      }
+  - name: set-target-url.js
+    type: jsc
+    content: |
+      var suffix = context.getVariable("proxy.pathsuffix") || "";
+      var qs = context.getVariable("request.querystring");
+      if (!qs) {
+        var uri = context.getVariable("request.uri") || "";
+        var qIdx = uri.indexOf("?");
+        if (qIdx !== -1) {
+          qs = uri.substring(qIdx + 1);
+        }
+      }
+
+      context.removeVariable("request.header.x-api-key");
+
+      var project = context.getVariable("organization.name") || "";
+      var rewrittenSuffix = suffix.replace(/\/projects\/[^\/]+/, "/projects/" + project);
+      if (rewrittenSuffix.indexOf("/v1/") !== 0 && rewrittenSuffix !== "/v1") {
+        rewrittenSuffix = "/v1" + (rewrittenSuffix.indexOf("/") === 0 ? "" : "/") + rewrittenSuffix;
+      }
+
+      var targetUrl = "https://aiplatform.googleapis.com" + rewrittenSuffix;
+      if (qs) {
+        targetUrl += "?" + qs;
+      }
+
+      context.setVariable("target.copy.pathsuffix", false);
+      context.setVariable("target.url", targetUrl);
+  - name: analytics.js
+    type: jsc
+    content: |
+      function safeJsonParse(str) {
+        if (!str) return null;
+        if (typeof str === "object") return str;
+        if (typeof str !== "string") return null;
+        var cleaned = str.trim();
+        if (cleaned.indexOf("{") !== 0 && cleaned.indexOf("[") !== 0) return null;
+        try { return JSON.parse(cleaned); } catch (e1) {
+          try { return JSON.parse(cleaned.replace(/\r?\n/g, "\\n")); } catch (e2) { return null; }
+        }
+      }
+
+      function extractUsageData(contentString) {
+        var usageData = {
+          model: "",
+          requestTokenCount: 0,
+          nonCachedRequestTokenCount: 0,
+          cachedReadTokenCount: 0,
+          cacheWriteTokenCount: 0,
+          responseTokenCount: 0,
+          totalTokenCount: 0,
+          usageFound: false
+        };
+        if (!contentString) return usageData;
+        var cleaned = typeof contentString === "string" ? contentString.trim() : "";
+        if (!cleaned && typeof contentString === "object") {
+          try { cleaned = JSON.stringify(contentString); } catch (e) { return usageData; }
+        }
+        if (cleaned.indexOf("[DONE]") !== -1 || cleaned.indexOf("message_stop") !== -1 || cleaned.indexOf("content_block") !== -1 || cleaned.indexOf("event: ping") !== -1) {
+          return usageData;
+        }
+        if (cleaned.indexOf("data:") !== -1) {
+          var lines = cleaned.split(/\r?\n/);
+          for (var i = lines.length - 1; i >= 0; i--) {
+            var l = lines[i].trim();
+            if (l.indexOf("data:") === 0) {
+              var candidate = l.substring(5).trim();
+              if (candidate.indexOf("{") === 0) { cleaned = candidate; break; }
+            }
+          }
+        } else if (cleaned.indexOf("event: ") === 0) {
+          var firstBrace = cleaned.indexOf("{");
+          if (firstBrace !== -1) cleaned = cleaned.substring(firstBrace).trim();
+        }
+        if (!cleaned || cleaned.indexOf("{") !== 0) return usageData;
+        try {
+          var d = JSON.parse(cleaned);
+          if (d.model) usageData.model = d.model;
+          if (d.modelVersion) usageData.model = d.modelVersion;
+          if (d.message && d.message.model) usageData.model = d.message.model;
+
+          if (d.usage && d.usage.prompt_tokens !== undefined) {
+            var oaiPrompt = d.usage.prompt_tokens || 0;
+            var oaiCached = (d.usage.prompt_tokens_details && d.usage.prompt_tokens_details.cached_tokens) || 0;
+            usageData.cachedReadTokenCount = oaiCached;
+            usageData.nonCachedRequestTokenCount = Math.max(0, oaiPrompt - oaiCached);
+            usageData.requestTokenCount = oaiPrompt;
+          }
+          if (d.message && d.message.usage && d.message.usage.input_tokens !== undefined) {
+            var msgIn = d.message.usage.input_tokens || 0;
+            var msgCacheRead = d.message.usage.cache_read_input_tokens || 0;
+            var msgCacheWrite = d.message.usage.cache_creation_input_tokens || 0;
+            usageData.nonCachedRequestTokenCount = msgIn;
+            usageData.cachedReadTokenCount = msgCacheRead;
+            usageData.cacheWriteTokenCount = msgCacheWrite;
+            usageData.requestTokenCount = msgIn + msgCacheRead + msgCacheWrite;
+          }
+          if (d.usage && d.usage.input_tokens !== undefined) {
+            var uIn = d.usage.input_tokens || 0;
+            var uCacheRead = d.usage.cache_read_input_tokens || 0;
+            var uCacheWrite = d.usage.cache_creation_input_tokens || 0;
+            usageData.nonCachedRequestTokenCount = uIn;
+            usageData.cachedReadTokenCount = uCacheRead;
+            usageData.cacheWriteTokenCount = uCacheWrite;
+            usageData.requestTokenCount = uIn + uCacheRead + uCacheWrite;
+          }
+          if (d.usageMetadata && d.usageMetadata.promptTokenCount !== undefined) {
+            var gPrompt = d.usageMetadata.promptTokenCount || 0;
+            var gCached = d.usageMetadata.cachedContentTokenCount || 0;
+            usageData.cachedReadTokenCount = gCached;
+            usageData.nonCachedRequestTokenCount = Math.max(0, gPrompt - gCached);
+            usageData.requestTokenCount = gPrompt;
+          }
+
+          if (d.usage && d.usage.completion_tokens !== undefined) usageData.responseTokenCount = d.usage.completion_tokens;
+          if (d.message && d.message.usage && d.message.usage.output_tokens !== undefined) usageData.responseTokenCount = d.message.usage.output_tokens;
+          if (d.usage && d.usage.output_tokens !== undefined) usageData.responseTokenCount = d.usage.output_tokens;
+          if (d.usageMetadata && d.usageMetadata.candidatesTokenCount !== undefined) usageData.responseTokenCount = d.usageMetadata.candidatesTokenCount;
+
+          if (!usageData.responseTokenCount) {
+            if (d.usage && d.usage.completion_tokens_details && d.usage.completion_tokens_details.reasoning_tokens !== undefined) {
+              usageData.responseTokenCount = d.usage.completion_tokens_details.reasoning_tokens;
+            } else if (d.usageMetadata && d.usageMetadata.thoughtsTokenCount !== undefined) {
+              usageData.responseTokenCount = d.usageMetadata.thoughtsTokenCount;
+            }
+          }
+          if (usageData.requestTokenCount > 0 || usageData.responseTokenCount > 0) usageData.usageFound = true;
+          usageData.totalTokenCount = usageData.requestTokenCount + usageData.responseTokenCount;
+        } catch (e) {}
+        return usageData;
+      }
+
+      var currentFlow = context.getVariable("current.flow.name");
+      var type = currentFlow === "EventFlow" ? "streaming" : "non-streaming";
+      var contentString = currentFlow === "EventFlow"
+        ? context.getVariable("response.event.current.content")
+        : context.getVariable("response.content");
+      if (!contentString) {
+        contentString = context.getVariable("response.content") || context.getVariable("response.event.current.content");
+      }
+
+      var prices = safeJsonParse(context.getVariable("ai.prices"));
+      if (!prices || !prices["default"]) {
+        prices = { "default": { "requestPerMillionTokens": 1, "responsePerMillionTokens": 3, "cachedPerMillionTokens": 0.1 } };
+      }
+      context.setVariable("ai.responseType", type);
+
+      var usageData = extractUsageData(contentString);
+      var modelName = String(context.getVariable("ai.model") || usageData.model || "");
+      if (usageData.model) {
+        modelName = usageData.model;
+        context.setVariable("ai.model", modelName);
+      }
+
+      var existingReqTokenCount = context.getVariable("ai.requestTokenCount");
+      if (existingReqTokenCount && !usageData.requestTokenCount) {
+        usageData.requestTokenCount = parseInt(existingReqTokenCount, 10) || 0;
+        usageData.nonCachedRequestTokenCount = usageData.requestTokenCount;
+      }
+
+      if (usageData.usageFound) {
+        context.setVariable("ai.usageDataFound", "true");
+        context.setVariable("ai.promptTokenCount", String(usageData.requestTokenCount));
+        context.setVariable("ai.requestTokenCount", String(usageData.requestTokenCount));
+        context.setVariable("ai.cachedTokenCount", String(usageData.cachedReadTokenCount));
+        context.setVariable("ai.responseTokenCount", String(usageData.responseTokenCount));
+        usageData.totalTokenCount = usageData.requestTokenCount + usageData.responseTokenCount;
+        context.setVariable("ai.totalTokenCount", String(usageData.totalTokenCount));
+
+        var timeToFirstToken = context.getVariable("ai.timeToFirstToken");
+        if (!timeToFirstToken) {
+          var reqStart = context.getVariable("client.received.start.timestamp");
+          if (reqStart) {
+            timeToFirstToken = Date.now() - reqStart;
+            context.setVariable("ai.timeToFirstToken", String(timeToFirstToken));
+          }
+        }
+
+        var costCenter = context.getVariable("ai.costCenter") ||
+                         context.getVariable("verifyapikey.VA-VerifyKey.developer.app.name") ||
+                         context.getVariable("flow.downstream_sub") ||
+                         "unknown";
+        context.setVariable("ai.costCenter", String(costCenter));
+
+        var cleanModel = modelName.indexOf("/") !== -1 ? modelName.split("/").pop() : modelName;
+        var priceEntry = prices[modelName] || prices[cleanModel] || prices["google/" + cleanModel] || prices["anthropic/" + cleanModel] || prices["default"];
+        var reqPrice = parseFloat(priceEntry.requestPerMillionTokens) || 0;
+        var cachedPrice = priceEntry.cachedPerMillionTokens !== undefined ? (parseFloat(priceEntry.cachedPerMillionTokens) || 0) : (reqPrice * 0.1);
+        var cacheWritePrice = priceEntry.cacheWritePerMillionTokens !== undefined ? (parseFloat(priceEntry.cacheWritePerMillionTokens) || 0) : (reqPrice * 1.25);
+        var respPrice = parseFloat(priceEntry.responsePerMillionTokens) || 0;
+
+        var reqCost = (parseFloat(usageData.nonCachedRequestTokenCount) * (reqPrice / 1000000)) +
+                      (parseFloat(usageData.cachedReadTokenCount) * (cachedPrice / 1000000)) +
+                      (parseFloat(usageData.cacheWriteTokenCount) * (cacheWritePrice / 1000000));
+        var respCost = parseFloat(usageData.responseTokenCount) * (respPrice / 1000000);
+
+        context.setVariable("ai.requestCost", String(reqCost));
+        context.setVariable("ai.responseCost", String(respCost));
+        context.setVariable("ai.totalCost", String(reqCost + respCost));
+      } else {
+        context.setVariable("ai.usageDataFound", "false");
+      }
+  - name: reset-usage-data-found.js
+    type: jsc
+    content: |
+      context.setVariable("ai.usageDataFound", "false");
