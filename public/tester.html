@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Apigee AI Gateway Tester</title>
+  <script>
+    {
+      const savedTheme = localStorage.getItem("tester_theme");
+      if (savedTheme === "light" || savedTheme === "dark") {
+        document.documentElement.classList.add(`theme-${savedTheme}`);
+      }
+    }
+  </script>
   <style>
     :root {
       color-scheme: light dark;
@@ -20,8 +28,26 @@
       --success: #1a7f37;
       --code-bg: #f0f3f6;
     }
+    :root.theme-light {
+      color-scheme: light;
+    }
+    :root.theme-dark {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-alt: #1f242c;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --border: #30363d;
+      --accent: #2f81f7;
+      --accent-hover: #58a6ff;
+      --accent-soft: rgba(47, 129, 247, 0.15);
+      --danger: #f85149;
+      --success: #3fb950;
+      --code-bg: #0d1117;
+    }
     @media (prefers-color-scheme: dark) {
-      :root {
+      :root:not(.theme-light) {
         --bg: #0d1117;
         --surface: #161b22;
         --surface-alt: #1f242c;
@@ -497,8 +523,11 @@
       color: #15803d;
       font-weight: 600;
     }
+    :root.theme-dark .gateway-endpoint {
+      color: #4ade80;
+    }
     @media (prefers-color-scheme: dark) {
-      .gateway-endpoint {
+      :root:not(.theme-light) .gateway-endpoint {
         color: #4ade80;
       }
     }
@@ -525,6 +554,10 @@
       font-size: 0.82rem;
       font-weight: 600;
       color: inherit;
+      background: transparent;
+      padding: 0;
+    }
+    a.gateway-url {
       text-decoration: underline;
       text-underline-offset: 2px;
     }
@@ -550,6 +583,89 @@
       margin: 0;
       background: var(--surface);
     }
+    .arch-diagram {
+      display: grid;
+      grid-template-columns: 1fr auto 1.1fr auto 1fr;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 1.25rem 0 0.5rem;
+      padding: 1rem 1.1rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+    }
+    .arch-col {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .arch-col-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin-bottom: 0.1rem;
+    }
+    .arch-node {
+      padding: 0.45rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 0.8rem;
+      font-weight: 500;
+      line-height: 1.25;
+    }
+    .arch-node small {
+      display: block;
+      font-size: 0.71rem;
+      font-weight: 400;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+    .arch-hub {
+      padding: 0.85rem 0.9rem;
+      border-radius: 8px;
+      border: 2px solid var(--accent);
+      background: var(--surface);
+      text-align: center;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+    }
+    .arch-hub-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 0.45rem;
+    }
+    .arch-hub-pills {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.3rem;
+    }
+    .arch-hub-pill {
+      font-size: 0.7rem;
+      padding: 0.18rem 0.45rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .arch-arrow {
+      font-size: 1.1rem;
+      color: var(--muted);
+      user-select: none;
+      text-align: center;
+    }
+    @media (max-width: 760px) {
+      .arch-diagram {
+        grid-template-columns: 1fr;
+      }
+      .arch-arrow {
+        transform: rotate(90deg);
+      }
+    }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -562,6 +678,11 @@
       <span id="authStatus" class="status" aria-live="polite">✕ No Access Token</span>
       <button id="copyTokenBtn" type="button" hidden>Copy Access Token</button>
       <button id="signOutBtn" type="button" hidden>Clear Token</button>
+      <select id="themeSelect" aria-label="Color theme" style="width: auto; padding: 0.4rem 0.65rem;">
+        <option value="system">Theme: System</option>
+        <option value="light">Theme: Light</option>
+        <option value="dark">Theme: Dark</option>
+      </select>
     </div>
   </header>
 
@@ -585,10 +706,40 @@
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
           <div class="gateway-endpoints">
-            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><code class="gateway-url" data-gateway-url></code></span>
             <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
           </div>
         </div>
+        <figure class="arch-diagram" aria-label="Apigee X AI Gateway architecture diagram">
+          <div class="arch-col">
+            <div class="arch-col-title">User Apps &amp; Agents</div>
+            <div class="arch-node">Antigravity<small>IDE &amp; agy CLI</small></div>
+            <div class="arch-node">Claude<small>Desktop &amp; claude CLI</small></div>
+            <div class="arch-node">Custom Apps &amp; Agents<small>Web, A2A &amp; API clients</small></div>
+          </div>
+
+          <div class="arch-arrow" aria-hidden="true">⇄</div>
+
+          <div class="arch-hub">
+            <div class="arch-hub-title">Apigee X AI Gateway</div>
+            <div class="arch-hub-pills">
+              <span class="arch-hub-pill">OAuth 2.1 / API Keys</span>
+              <span class="arch-hub-pill">LLM Token Quota</span>
+              <span class="arch-hub-pill">Failover &amp; Routing</span>
+              <span class="arch-hub-pill">DLP &amp; Model Armor</span>
+              <span class="arch-hub-pill">Cost Analytics</span>
+            </div>
+          </div>
+
+          <div class="arch-arrow" aria-hidden="true">⇄</div>
+
+          <div class="arch-col">
+            <div class="arch-col-title">Providers, Tools &amp; Agents</div>
+            <div class="arch-node">Model Providers<small>Model Garden, External, OSS</small></div>
+            <div class="arch-node">Tools<small>MCP &amp; API Servers</small></div>
+            <div class="arch-node">Agents<small>A2A Services</small></div>
+          </div>
+        </figure>
         <p>
           You can try out the <strong>Antigravity</strong> and <strong>Claude</strong> desktop apps and CLIs (<code>agy</code>, <code>claude</code>) directly in this VM using the Apigee AI Gateway, and use this tester app to explore and test these use-cases:
         </p>
@@ -599,7 +750,7 @@
           <li><strong>A2A &amp; MCP Governance</strong> — Invoke scoped Agent-to-Agent (A2A) skills, MCP tools, and an interactive Customer Agent backed by the AI Router.</li>
         </ul>
         <p>
-          Visit the <a id="portalLink" href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer">Apigee AI Portal</a> (opens in a new tab) to view your subscriptions and analytics usage, or open the <strong>Apigee Proxies</strong> link in the parent app <strong>Links</strong> dialog and filter by <code>ai-platform</code> to inspect the proxies used.
+          Visit the <a id="portalLink" href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer">Apigee AI Portal</a> (opens in a new tab) to view your subscriptions and analytics usage, or open <strong>Links</strong> in the parent app to see the Apigee proxies, monitoring and configuration.
         </p>
 
         <div class="panel-footer">
@@ -613,7 +764,7 @@
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
           <div class="gateway-endpoints">
-            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><code class="gateway-url" data-gateway-url></code></span>
             <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
           </div>
         </div>
@@ -819,7 +970,7 @@
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
           <div class="gateway-endpoints">
-            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><code class="gateway-url" data-gateway-url></code></span>
             <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
           </div>
         </div>
@@ -915,7 +1066,7 @@
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
           <div class="gateway-endpoints">
-            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><code class="gateway-url" data-gateway-url></code></span>
             <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
           </div>
         </div>
@@ -983,7 +1134,7 @@ agy "Explain the Apigee AI gateway"</pre>
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
           <div class="gateway-endpoints">
-            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><code class="gateway-url" data-gateway-url></code></span>
             <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
           </div>
         </div>
@@ -1051,7 +1202,7 @@ claude -p "Summarize recent changes"</pre>
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
           <div class="gateway-endpoints">
-            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><code class="gateway-url" data-gateway-url></code></span>
             <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
           </div>
         </div>
@@ -1117,7 +1268,7 @@ claude -p "Summarize recent changes"</pre>
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
           <div class="gateway-endpoints">
-            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><code class="gateway-url" data-gateway-url></code></span>
             <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
           </div>
         </div>
@@ -2663,6 +2814,22 @@ claude -p "Summarize recent changes"</pre>
         }
       } else {
         updateTokenUI("");
+      }
+
+      const themeSelect = document.getElementById("themeSelect");
+      if (themeSelect) {
+        const savedTheme = localStorage.getItem("tester_theme");
+        themeSelect.value = savedTheme === "light" || savedTheme === "dark" ? savedTheme : "system";
+        themeSelect.addEventListener("change", () => {
+          const val = themeSelect.value;
+          document.documentElement.classList.remove("theme-light", "theme-dark");
+          if (val === "light" || val === "dark") {
+            document.documentElement.classList.add(`theme-${val}`);
+            localStorage.setItem("tester_theme", val);
+          } else {
+            localStorage.removeItem("tester_theme");
+          }
+        });
       }
 
       const savedTab = sessionStorage.getItem(STORAGE_KEYS.activeTab);
