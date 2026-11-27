@@ -473,19 +473,47 @@
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem 1rem;
-      padding: 0.6rem 0.9rem;
+      padding: 0.65rem 0.95rem;
       margin-bottom: 1rem;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: var(--code-bg);
+      border-radius: 8px;
+      border: 1px solid rgba(26, 127, 55, 0.35);
+      background: rgba(26, 127, 55, 0.08);
       font-size: 0.85rem;
     }
     .gateway-label {
-      color: var(--muted);
+      color: var(--text);
       font-weight: 500;
+    }
+    .gateway-endpoint {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: #15803d;
+      font-weight: 600;
+    }
+    @media (prefers-color-scheme: dark) {
+      .gateway-endpoint {
+        color: #4ade80;
+      }
+    }
+    .gateway-check {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #16a34a;
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      flex-shrink: 0;
     }
     .gateway-url {
       font-weight: 600;
+      color: inherit;
+      background: transparent;
+      padding: 0;
     }
     .curl-box {
       margin-top: 1.25rem;
@@ -542,8 +570,8 @@
       <section id="panel-welcome" class="panel" role="tabpanel" aria-labelledby="tab-welcome">
         <h2>Welcome to the Apigee AI Gateway Tester</h2>
         <div class="gateway-banner">
-          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
-          <code class="gateway-url" data-gateway-url></code>
+          <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
+          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
         </div>
         <p>
           You can try out the <strong>Antigravity</strong> and <strong>Claude</strong> desktop apps and CLIs (<code>agy</code>, <code>claude</code>) directly in this VM using the Apigee AI Gateway, and use this tester app to explore and test these use-cases:
@@ -567,8 +595,8 @@
       <section id="panel-token" class="panel" role="tabpanel" aria-labelledby="tab-token" hidden>
         <h2>Token &amp; KVM Configuration</h2>
         <div class="gateway-banner">
-          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
-          <code class="gateway-url" data-gateway-url></code>
+          <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
+          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
         </div>
         <p class="hint">
           Select OAuth 2.1 scopes to obtain a JWT from <code>/token</code>, and manage <code>AI-Demo</code> KVM properties.
@@ -770,8 +798,8 @@
       <section id="panel-router" class="panel" role="tabpanel" aria-labelledby="tab-router" hidden>
         <h2>Test AI Router</h2>
         <div class="gateway-banner">
-          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
-          <code class="gateway-url" data-gateway-url></code>
+          <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
+          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
         </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
@@ -863,8 +891,8 @@
       <section id="panel-antigravity" class="panel" role="tabpanel" aria-labelledby="tab-antigravity" hidden>
         <h2>Test Antigravity</h2>
         <div class="gateway-banner">
-          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
-          <code class="gateway-url" data-gateway-url></code>
+          <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
+          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
         </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
@@ -928,8 +956,8 @@ agy "Explain the Apigee AI gateway"</pre>
       <section id="panel-claude" class="panel" role="tabpanel" aria-labelledby="tab-claude" hidden>
         <h2>Test Claude</h2>
         <div class="gateway-banner">
-          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
-          <code class="gateway-url" data-gateway-url></code>
+          <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
+          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
         </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
@@ -993,8 +1021,8 @@ claude -p "Summarize recent changes"</pre>
       <section id="panel-a2amcp" class="panel" role="tabpanel" aria-labelledby="tab-a2amcp" hidden>
         <h2>Test Customer A2A &amp; MCP</h2>
         <div class="gateway-banner">
-          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
-          <code class="gateway-url" data-gateway-url></code>
+          <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
+          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
         </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
@@ -1056,8 +1084,8 @@ claude -p "Summarize recent changes"</pre>
         </div>
 
         <div class="gateway-banner">
-          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
-          <code class="gateway-url" data-gateway-url></code>
+          <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
+          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
         </div>
 
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
