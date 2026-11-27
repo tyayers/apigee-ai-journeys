@@ -484,6 +484,12 @@
       color: var(--text);
       font-weight: 500;
     }
+    .gateway-endpoints {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+    }
     .gateway-endpoint {
       display: inline-flex;
       align-items: center;
@@ -509,11 +515,18 @@
       font-weight: 700;
       flex-shrink: 0;
     }
+    .gateway-link-label {
+      font-size: 0.78rem;
+      font-weight: 500;
+      opacity: 0.85;
+    }
     .gateway-url {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
       font-weight: 600;
       color: inherit;
-      background: transparent;
-      padding: 0;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
     .curl-box {
       margin-top: 1.25rem;
@@ -571,7 +584,10 @@
         <h2>Welcome to the Apigee AI Gateway Tester</h2>
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
-          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
+          <div class="gateway-endpoints">
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
+          </div>
         </div>
         <p>
           You can try out the <strong>Antigravity</strong> and <strong>Claude</strong> desktop apps and CLIs (<code>agy</code>, <code>claude</code>) directly in this VM using the Apigee AI Gateway, and use this tester app to explore and test these use-cases:
@@ -596,7 +612,10 @@
         <h2>Token &amp; KVM Configuration</h2>
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
-          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
+          <div class="gateway-endpoints">
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
+          </div>
         </div>
         <p class="hint">
           Select OAuth 2.1 scopes to obtain a JWT from <code>/token</code>, and manage <code>AI-Demo</code> KVM properties.
@@ -679,7 +698,7 @@
               <button id="getTokenBtn" type="submit" class="primary">Get Access Token</button>
               <span id="nextRouterWrap" class="tooltip-anchor" tabindex="0">
                 <button id="nextRouterBtn" type="button" class="primary" data-next-tab="tab-router" disabled aria-describedby="nextRouterTooltip">Next: Test AI Router →</button>
-                <span id="nextRouterTooltip" role="tooltip" class="tooltip-bubble">You need an access token to proceed.</span>
+                <span id="nextRouterTooltip" role="tooltip" class="tooltip-bubble">First click 'Get Access Token' to proceed.</span>
               </span>
               <span id="tokenStatus" class="status" aria-live="polite"></span>
             </div>
@@ -799,7 +818,10 @@
         <h2>Test AI Router</h2>
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
-          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
+          <div class="gateway-endpoints">
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
+          </div>
         </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
@@ -892,7 +914,10 @@
         <h2>Test Antigravity</h2>
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
-          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
+          <div class="gateway-endpoints">
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
+          </div>
         </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
@@ -957,7 +982,10 @@ agy "Explain the Apigee AI gateway"</pre>
         <h2>Test Claude</h2>
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
-          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
+          <div class="gateway-endpoints">
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
+          </div>
         </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
@@ -1022,7 +1050,10 @@ claude -p "Summarize recent changes"</pre>
         <h2>Test Customer A2A &amp; MCP</h2>
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
-          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
+          <div class="gateway-endpoints">
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
+          </div>
         </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
@@ -1085,7 +1116,10 @@ claude -p "Summarize recent changes"</pre>
 
         <div class="gateway-banner">
           <span class="gateway-label">Apigee X Endpoint on GCP. Can also be deployed to AWS, Azure or K8s on-premise.</span>
-          <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><code class="gateway-url" data-gateway-url></code></span>
+          <div class="gateway-endpoints">
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Gateway:</span><a class="gateway-url" data-gateway-url href="https://api.apigee-bap7.agenticplatform.dev" target="_blank" rel="noopener noreferrer"></a></span>
+            <span class="gateway-endpoint"><span class="gateway-check" aria-hidden="true">✓</span><span class="gateway-link-label">Portal:</span><a class="gateway-url" data-portal-url href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer"></a></span>
+          </div>
         </div>
 
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
@@ -2391,11 +2425,21 @@ claude -p "Summarize recent changes"</pre>
     });
 
     // --- Gateway URL Banners & Live cURL Previews ---
+    let resolvedPortalUrl = null;
+
     function updateGatewayUrlDisplays() {
       const host = getApigeeHost();
+      const portalHref = resolvedPortalUrl || `${host}/portal`;
       document.querySelectorAll("[data-gateway-url]").forEach((el) => {
         el.textContent = host;
+        if (el.tagName === "A") el.href = host;
       });
+      document.querySelectorAll("[data-portal-url]").forEach((el) => {
+        el.textContent = portalHref;
+        if (el.tagName === "A") el.href = portalHref;
+      });
+      const portalLink = document.getElementById("portalLink");
+      if (portalLink) portalLink.href = portalHref;
     }
 
     function shellQuoteSingle(str) {
@@ -2590,17 +2634,16 @@ claude -p "Summarize recent changes"</pre>
       apigeeHostInput.value = getApigeeHost();
       updateGatewayUrlDisplays();
       updateAllCurlCommands();
-      const portalLink = document.getElementById("portalLink");
-      if (portalLink) {
-        portalLink.href = `${getApigeeHost()}/portal`;
-        fetch("/api/me")
-          .then((r) => (r.ok ? r.json() : null))
-          .then((data) => {
-            const portal = data?.links?.find((l) => l.name === "Apigee AI Portal" && l.url);
-            if (portal) portalLink.href = portal.url;
-          })
-          .catch(() => {});
-      }
+      fetch("/api/me")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          const portal = data?.links?.find((l) => l.name === "Apigee AI Portal" && l.url);
+          if (portal) {
+            resolvedPortalUrl = portal.url;
+            updateGatewayUrlDisplays();
+          }
+        })
+        .catch(() => {});
       updateCredentialsSummary();
       applyAgentPreset();
       restoreScopeSelections();
