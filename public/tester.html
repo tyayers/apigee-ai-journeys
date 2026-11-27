@@ -233,6 +233,7 @@
     }
     button.primary:hover:not(:disabled) { background: var(--accent-hover); }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .nav-tab:disabled { opacity: 0.45; cursor: not-allowed; background: transparent; color: var(--muted); }
     .tooltip-anchor {
       position: relative;
       display: inline-flex;
@@ -486,11 +487,11 @@
       <div class="nav-tabs" role="tablist" aria-orientation="vertical">
         <button id="tab-welcome" class="nav-tab" role="tab" type="button" aria-selected="true" aria-controls="panel-welcome">1. Welcome</button>
         <button id="tab-token" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-token">2. Token &amp; Config</button>
-        <button id="tab-router" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-router">3. Test AI Router</button>
-        <button id="tab-antigravity" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-antigravity">4. Test Antigravity</button>
-        <button id="tab-claude" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-claude">5. Test Claude</button>
-        <button id="tab-a2amcp" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-a2amcp">6. Test A2A / MCP</button>
-        <button id="tab-agent" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-agent">7. Example Agent (A2A)</button>
+        <button id="tab-router" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-router" disabled title="Get an access token in Step 2 first">3. Test AI Router</button>
+        <button id="tab-antigravity" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-antigravity" disabled title="Get an access token in Step 2 first">4. Test Antigravity</button>
+        <button id="tab-claude" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-claude" disabled title="Get an access token in Step 2 first">5. Test Claude</button>
+        <button id="tab-a2amcp" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-a2amcp" disabled title="Get an access token in Step 2 first">6. Test A2A / MCP</button>
+        <button id="tab-agent" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-agent" disabled title="Get an access token in Step 2 first">7. Example Agent (A2A)</button>
       </div>
     </aside>
 
@@ -499,13 +500,17 @@
       <section id="panel-welcome" class="panel" role="tabpanel" aria-labelledby="tab-welcome">
         <h2>Welcome to the Apigee AI Gateway Tester</h2>
         <p>
-          Explore and test enterprise AI governance powered by Apigee X:
+          You can try out the <strong>Antigravity</strong> and <strong>Claude</strong> desktop apps and CLIs (<code>agy</code>, <code>claude</code>) directly in this VM using the Apigee AI Gateway, and use this tester app to explore and test these use-cases:
         </p>
         <ul>
           <li><strong>OAuth 2.1 Scoped Tokens</strong> — Mint short-lived RS256 JWTs with fine-grained scopes (<code>starter-models</code>, <code>advanced-models</code>, <code>customer-viewer</code>, <code>customer-admin</code>).</li>
           <li><strong>Health-Aware AI Router &amp; KVM Controls</strong> — Test multi-region failover, <code>x-data-classification</code> EU residency enforcement, Model Armor prompt screening, DLP PII masking, smart model routing, and live <code>AI-Demo</code> KVM configuration.</li>
+          <li><strong>Antigravity &amp; Claude Gateways</strong> — Test the <code>/antigravity</code> and <code>/claude</code> proxies with <code>GoogleAccessToken</code> target auth, <code>LLMTokenQuota</code> enforcement, and cached token cost analytics.</li>
           <li><strong>A2A &amp; MCP Governance</strong> — Invoke scoped Agent-to-Agent (A2A) skills, MCP tools, and an interactive Customer Agent backed by the AI Router.</li>
         </ul>
+        <p>
+          Visit the <a id="portalLink" href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer">Apigee AI Portal</a> (opens in a new tab) to view your subscriptions and analytics usage, or open the <strong>Apigee Proxies</strong> link in the parent app sidebar and filter by <code>ai-platform</code> to inspect the proxies used.
+        </p>
 
         <details id="credentialsDetails" class="creds-details">
           <summary id="credentialsSummary">
@@ -1040,8 +1045,13 @@ claude -p "Summarize recent changes"</pre>
     // --- Tab switching (with keyboard arrow support) ---
     const tabButtons = Array.from(document.querySelectorAll('[role="tab"]'));
     const tabPanels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+    const GATED_TAB_IDS = new Set(["tab-router", "tab-antigravity", "tab-claude", "tab-a2amcp", "tab-agent"]);
 
     function activateTab(tabId) {
+      const targetBtn = document.getElementById(tabId);
+      if (targetBtn && targetBtn.disabled) {
+        tabId = "tab-token";
+      }
       tabButtons.forEach((btn) => {
         const isSelected = btn.id === tabId;
         btn.setAttribute("aria-selected", isSelected ? "true" : "false");
@@ -1055,16 +1065,21 @@ claude -p "Summarize recent changes"</pre>
     }
 
     tabButtons.forEach((btn, idx) => {
-      btn.addEventListener("click", () => activateTab(btn.id));
+      btn.addEventListener("click", () => {
+        if (!btn.disabled) activateTab(btn.id);
+      });
       btn.addEventListener("keydown", (e) => {
+        const enabledTabs = tabButtons.filter((b) => !b.disabled);
+        const curIdx = enabledTabs.indexOf(btn);
+        if (curIdx === -1) return;
         if (e.key === "ArrowDown" || e.key === "ArrowRight") {
           e.preventDefault();
-          const next = tabButtons[(idx + 1) % tabButtons.length];
+          const next = enabledTabs[(curIdx + 1) % enabledTabs.length];
           activateTab(next.id);
           next.focus();
         } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
           e.preventDefault();
-          const prev = tabButtons[(idx - 1 + tabButtons.length) % tabButtons.length];
+          const prev = enabledTabs[(curIdx - 1 + enabledTabs.length) % enabledTabs.length];
           activateTab(prev.id);
           prev.focus();
         }
@@ -1227,6 +1242,22 @@ claude -p "Summarize recent changes"</pre>
         tokenClaims.textContent = "";
       }
       authWarnings.forEach((el) => { el.hidden = hasToken; });
+      tabButtons.forEach((btn) => {
+        if (GATED_TAB_IDS.has(btn.id)) {
+          btn.disabled = !hasToken;
+          if (hasToken) {
+            btn.removeAttribute("title");
+          } else {
+            btn.setAttribute("title", "Get an access token in Step 2 first");
+          }
+        }
+      });
+      if (!hasToken) {
+        const activeBtn = tabButtons.find((b) => b.getAttribute("aria-selected") === "true");
+        if (activeBtn && GATED_TAB_IDS.has(activeBtn.id)) {
+          activateTab("tab-token");
+        }
+      }
       if (nextRouterBtn) {
         nextRouterBtn.disabled = !hasToken;
         if (hasToken) {
@@ -2256,6 +2287,17 @@ claude -p "Summarize recent changes"</pre>
       clientIdInput.value = getClientId();
       clientSecretInput.value = getClientSecret();
       apigeeHostInput.value = getApigeeHost();
+      const portalLink = document.getElementById("portalLink");
+      if (portalLink) {
+        portalLink.href = `${getApigeeHost()}/portal`;
+        fetch("/api/me")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            const portal = data?.links?.find((l) => l.name === "Apigee AI Portal" && l.url);
+            if (portal) portalLink.href = portal.url;
+          })
+          .catch(() => {});
+      }
       updateCredentialsSummary();
       applyAgentPreset();
       restoreScopeSelections();

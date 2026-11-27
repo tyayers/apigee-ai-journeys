@@ -443,41 +443,55 @@ resources:
       var bearerToken = String(context.getVariable("flow.bearer_token") || "").trim();
       var xApiKey = String(context.getVariable("request.header.x-api-key") || "").trim();
       var xGoogApiKey = String(context.getVariable("request.header.x-goog-api-key") || "").trim();
-      var token = bearerToken || xApiKey || xGoogApiKey;
+      var explicitKey = xApiKey || xGoogApiKey;
 
       var host = context.getVariable("request.header.host") || "";
       var proto = context.getVariable("client.scheme") || "https";
       context.setVariable("flow.token_issuer", proto + "://" + host);
 
-      if (!token) {
+      function decodeJwtPart(b64Url) {
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        var b64 = b64Url.replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
+        var out = "";
+        for (var bc = 0, bs = 0, buffer, idx = 0; (buffer = b64.charAt(idx++)); ) {
+          var pos = chars.indexOf(buffer);
+          if (pos !== -1) {
+            bs = bc % 4 ? bs * 64 + pos : pos;
+            if (bc++ % 4) out += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+          }
+        }
+        return JSON.parse(out);
+      }
+
+      if (explicitKey) {
+        context.setVariable("flow.auth_type", "apikey");
+        context.setVariable("flow.api_key", explicitKey);
+      } else if (!bearerToken) {
         context.setVariable("flow.auth_type", "none");
       } else {
-        var parts = token.split(".");
-        if (bearerToken && parts.length === 3) {
-          context.setVariable("flow.auth_type", "jwt");
-          var aud = "";
+        var parts = bearerToken.split(".");
+        var isJwt = false;
+        var aud = "";
+        if (parts.length === 3) {
           try {
-            var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-            var b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/").replace(/=+$/, "");
-            var out = "";
-            for (var bc = 0, bs = 0, buffer, idx = 0; (buffer = b64.charAt(idx++)); ) {
-              var pos = chars.indexOf(buffer);
-              if (pos !== -1) {
-                bs = bc % 4 ? bs * 64 + pos : pos;
-                if (bc++ % 4) out += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)));
+            var header = decodeJwtPart(parts[0]);
+            var payload = decodeJwtPart(parts[1]);
+            if (header && typeof header.alg === "string" && payload && typeof payload === "object") {
+              isJwt = true;
+              if (Array.isArray(payload.aud)) {
+                aud = String(payload.aud[0] || "");
+              } else if (payload.aud) {
+                aud = String(payload.aud);
               }
             }
-            var payload = JSON.parse(out);
-            if (Array.isArray(payload.aud)) {
-              aud = String(payload.aud[0] || "");
-            } else if (payload.aud) {
-              aud = String(payload.aud);
-            }
           } catch (e) {}
+        }
+        if (isJwt) {
+          context.setVariable("flow.auth_type", "jwt");
           context.setVariable("flow.jwt_aud", aud);
         } else {
           context.setVariable("flow.auth_type", "apikey");
-          context.setVariable("flow.api_key", token);
+          context.setVariable("flow.api_key", bearerToken);
         }
       }
   - name: check-model-scope.js
