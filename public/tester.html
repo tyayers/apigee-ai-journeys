@@ -488,7 +488,7 @@
         <button id="tab-token" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-token">2. Token &amp; Config</button>
         <button id="tab-router" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-router">3. Test AI Router</button>
         <button id="tab-antigravity" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-antigravity">4. Test Antigravity</button>
-        <button id="tab-claude" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-claude">5. Test Claude Code</button>
+        <button id="tab-claude" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-claude">5. Test Claude</button>
         <button id="tab-a2amcp" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-a2amcp">6. Test A2A / MCP</button>
         <button id="tab-agent" class="nav-tab" role="tab" type="button" aria-selected="false" aria-controls="panel-agent">7. Example Agent (A2A)</button>
       </div>
@@ -815,10 +815,7 @@ agy "Explain the Apigee AI gateway"</pre>
         </div>
 
         <div class="row" style="justify-content: space-between; margin-bottom: 0.65rem;">
-          <label class="radio-option" style="margin: 0;">
-            <input type="checkbox" id="agyLiveMode">
-            Send prompts to live <code>/antigravity</code> Apigee proxy
-          </label>
+          <span class="hint" style="margin: 0;">All prompts go through the live <code>/antigravity</code> Apigee proxy.</span>
           <button id="agyClearBtn" type="button">Clear Terminal</button>
         </div>
 
@@ -843,13 +840,13 @@ agy "Explain the Apigee AI gateway"</pre>
         </div>
 
         <div class="panel-footer">
-          <button type="button" class="primary" data-next-tab="tab-claude">Next: Test Claude Code →</button>
+          <button type="button" class="primary" data-next-tab="tab-claude">Next: Test Claude →</button>
         </div>
       </section>
 
-      <!-- Tab 5: Test Claude Code -->
+      <!-- Tab 5: Test Claude -->
       <section id="panel-claude" class="panel" role="tabpanel" aria-labelledby="tab-claude" hidden>
-        <h2>Test Claude Code</h2>
+        <h2>Test Claude</h2>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
           Launch Claude Code from the terminal or desktop via <code>ai-platform-claude</code> (<code>/claude</code>), or try the interactive CLI simulator below.
@@ -871,10 +868,7 @@ claude -p "Summarize recent changes"</pre>
         </div>
 
         <div class="row" style="justify-content: space-between; margin-bottom: 0.65rem;">
-          <label class="radio-option" style="margin: 0;">
-            <input type="checkbox" id="claudeLiveMode">
-            Send prompts to live <code>/claude</code> Apigee proxy
-          </label>
+          <span class="hint" style="margin: 0;">All prompts go through the live <code>/claude</code> Apigee proxy.</span>
           <button id="claudeClearBtn" type="button">Clear Terminal</button>
         </div>
 
@@ -2036,7 +2030,6 @@ claude -p "Summarize recent changes"</pre>
       const formEl = document.getElementById(config.formId);
       const inputEl = document.getElementById(config.inputId);
       const clearBtn = document.getElementById(config.clearBtnId);
-      const liveCheckbox = document.getElementById(config.liveId);
       const modelBadge = document.getElementById(config.badgeId);
       let currentModel = config.defaultModel;
 
@@ -2079,7 +2072,7 @@ claude -p "Summarize recent changes"</pre>
         }
         if (trimmed === "/help" || trimmed === `${config.bin} --help`) {
           appendLine(
-            `Commands:\n  ${config.bin} --version       Show CLI version\n  /status                Show gateway URL, token & active model\n  /model <name>          Switch active model\n  /clear                 Clear terminal output\n  <prompt>               Run a prompt (simulated or live via ${config.proxyPath})`,
+            `Commands:\n  ${config.bin} --version       Show CLI version\n  /status                Show gateway URL, token & active model\n  /model <name>          Switch active model\n  /clear                 Clear terminal output\n  <prompt>               Send a prompt through live Apigee proxy ${config.proxyPath}`,
             "terminal-line-muted"
           );
           return;
@@ -2091,7 +2084,7 @@ claude -p "Summarize recent changes"</pre>
         if (trimmed === "/status") {
           const token = getAccessToken();
           appendLine(
-            `Gateway: ${getApigeeHost()}${config.proxyPath}\nModel:   ${currentModel}\nAuth:    ${token ? "Bearer token active" : "No token (configure in Step 2)"}\nMode:    ${liveCheckbox.checked ? "Live Apigee proxy" : "Simulated local CLI"}`,
+            `Gateway: ${getApigeeHost()}${config.proxyPath}\nModel:   ${currentModel}\nAuth:    ${token ? "Bearer token active" : "No token (configure in Step 2)"}\nMode:    Live Apigee proxy`,
             "terminal-line-ok"
           );
           return;
@@ -2109,26 +2102,21 @@ claude -p "Summarize recent changes"</pre>
         }
 
         const promptText = extractPrompt(trimmed);
-        if (liveCheckbox.checked) {
-          const token = getAccessToken();
-          if (!token) {
-            appendLine("✕ No access token found. Get a token in Step 2 (Token & Config) first.", "terminal-line-err");
-            return;
+        const token = getAccessToken();
+        if (!token) {
+          appendLine("✕ No access token found. Get a token in Step 2 (Token & Config) first.", "terminal-line-err");
+          return;
+        }
+        appendLine(`[${config.bin}] Sending request to ${getApigeeHost()}${config.proxyPath} (${currentModel})...`, "terminal-line-muted");
+        try {
+          const res = await config.sendLive(getApigeeHost(), token, currentModel, promptText);
+          if (!res.ok) {
+            appendLine(`✕ HTTP ${res.status}: ${res.text}`, "terminal-line-err");
+          } else {
+            appendLine(res.text, "terminal-line-ok");
           }
-          appendLine(`[${config.bin}] Sending request to ${getApigeeHost()}${config.proxyPath} (${currentModel})...`, "terminal-line-muted");
-          try {
-            const res = await config.sendLive(getApigeeHost(), token, currentModel, promptText);
-            if (!res.ok) {
-              appendLine(`✕ HTTP ${res.status}: ${res.text}`, "terminal-line-err");
-            } else {
-              appendLine(res.text, "terminal-line-ok");
-            }
-          } catch (err) {
-            appendLine(`✕ Request failed: ${err.message}`, "terminal-line-err");
-          }
-        } else {
-          appendLine(`[simulated ${config.bin} • ${currentModel}]`, "terminal-line-muted");
-          appendLine(config.simulateReply(promptText, currentModel), "terminal-line-ok");
+        } catch (err) {
+          appendLine(`✕ Request failed: ${err.message}`, "terminal-line-err");
         }
       }
 
@@ -2155,16 +2143,11 @@ claude -p "Summarize recent changes"</pre>
       formId: "agyForm",
       inputId: "agyInput",
       clearBtnId: "agyClearBtn",
-      liveId: "agyLiveMode",
       badgeId: "agyModelBadge",
       defaultModel: "gemini-4-hydrogen",
       proxyPath: "/antigravity",
       banner: "Antigravity CLI v2.4.0 — Apigee Enterprise Gateway (/antigravity)",
       versionText: "antigravity-cli 2.4.0 (gateway: /antigravity)",
-      simulateReply: (prompt, model) =>
-        prompt.toLowerCase().includes("pong")
-          ? "PONG"
-          : `Analyzed "${prompt}" using ${model} via Apigee /antigravity (GoogleAccessToken + LLMTokenQuota).`,
       sendLive: async (host, token, model, prompt) => {
         const url = `${host}/antigravity/v1beta/models/${encodeURIComponent(model)}:generateContent`;
         const resp = await fetch(url, {
@@ -2194,16 +2177,11 @@ claude -p "Summarize recent changes"</pre>
       formId: "claudeForm",
       inputId: "claudeInput",
       clearBtnId: "claudeClearBtn",
-      liveId: "claudeLiveMode",
       badgeId: "claudeModelBadge",
       defaultModel: "claude-sonnet-5-5",
       proxyPath: "/claude",
       banner: "Claude Code CLI v2.1.0 — Apigee Enterprise Gateway (/claude)",
       versionText: "claude-code 2.1.0 (Vertex AI via /claude)",
-      simulateReply: (prompt, model) =>
-        prompt.toLowerCase().includes("pong")
-          ? "PONG"
-          : `Processed "${prompt}" with ${model} via Apigee /claude (Vertex AI rawPredict + token cost analytics).`,
       sendLive: async (host, token, model, prompt) => {
         const url = `${host}/claude/projects/default/locations/global/publishers/anthropic/models/${encodeURIComponent(model)}:rawPredict`;
         const resp = await fetch(url, {

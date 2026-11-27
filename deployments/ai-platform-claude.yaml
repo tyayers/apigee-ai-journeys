@@ -566,12 +566,65 @@ resources:
       context.removeVariable("request.header.x-api-key");
 
       var project = context.getVariable("organization.name") || "";
-      var rewrittenSuffix = suffix.replace(/\/projects\/[^\/]+/, "/projects/" + project);
-      if (rewrittenSuffix.indexOf("/v1/") !== 0 && rewrittenSuffix !== "/v1") {
-        rewrittenSuffix = "/v1" + (rewrittenSuffix.indexOf("/") === 0 ? "" : "/") + rewrittenSuffix;
+      var targetUrl;
+
+      if (suffix.indexOf("/projects/") !== -1) {
+        var rewrittenSuffix = suffix.replace(/\/projects\/[^\/]+/, "/projects/" + project);
+        if (rewrittenSuffix.indexOf("/v1/") !== 0 && rewrittenSuffix !== "/v1") {
+          rewrittenSuffix = "/v1" + (rewrittenSuffix.indexOf("/") === 0 ? "" : "/") + rewrittenSuffix;
+        }
+        targetUrl = "https://aiplatform.googleapis.com" + rewrittenSuffix;
+      } else {
+        var rawBody = context.getVariable("request.content") || request.content;
+        var body = null;
+        try {
+          body = request.content.asJSON;
+        } catch (e) {}
+        if (!body && rawBody) {
+          if (typeof rawBody === "object") {
+            body = rawBody;
+          } else if (typeof rawBody === "string") {
+            try {
+              body = JSON.parse(rawBody);
+            } catch (e) {}
+          }
+        }
+
+        var model = String(context.getVariable("ai.model") || "");
+        var isStreaming = false;
+        if (body && typeof body === "object") {
+          if (body.model) {
+            model = String(body.model);
+          }
+          isStreaming = Boolean(body.stream);
+          if (!body["anthropic_version"]) {
+            body["anthropic_version"] = "vertex-2023-10-16";
+          }
+          delete body.model;
+          delete body.context_management;
+          request.content = JSON.stringify(body);
+        }
+        if (model.indexOf("anthropic/") === 0) {
+          model = model.substring("anthropic/".length);
+        }
+
+        context.removeVariable("request.header.anthropic-beta");
+
+        if (qs) {
+          var keptParams = [];
+          var pairs = qs.split("&");
+          for (var i = 0; i < pairs.length; i++) {
+            if (pairs[i] && pairs[i].indexOf("beta=") !== 0) {
+              keptParams.push(pairs[i]);
+            }
+          }
+          qs = keptParams.join("&");
+        }
+
+        var method = isStreaming ? "streamRawPredict" : "rawPredict";
+        targetUrl = "https://aiplatform.googleapis.com/v1/projects/" + project + "/locations/global/publishers/anthropic/models/" + model + ":" + method;
       }
 
-      var targetUrl = "https://aiplatform.googleapis.com" + rewrittenSuffix;
       if (qs) {
         targetUrl += "?" + qs;
       }

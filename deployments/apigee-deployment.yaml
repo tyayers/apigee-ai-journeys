@@ -59,7 +59,7 @@ products:
     quotaTimeUnit: month
     operations: []
     llmOperations:
-      - apiSource: REST-AI-Messages
+      - apiSource: ai-platform-claude
         operations:
           - name: /
             methods:
@@ -69,7 +69,7 @@ products:
               limit: "200000"
               interval: "1"
               timeUnit: day
-      - apiSource: REST-AI-Messages
+      - apiSource: ai-platform-claude
         operations:
           - name: /
             methods:
@@ -79,21 +79,21 @@ products:
               limit: "200000"
               interval: "1"
               timeUnit: day
-      - apiSource: REST-AI-Messages
+      - apiSource: ai-platform-claude
         operations:
           - name: /
             methods:
               - POST
             model: claude-haiku-5-5
             llmTokenQuota: {}
-      - apiSource: REST-AI-Antigravity
+      - apiSource: ai-platform-antigravity
         operations:
           - name: /
             methods:
               - POST
             model: gemini-3.5-flash-lite
             llmTokenQuota: {}
-      - apiSource: REST-AI-Antigravity
+      - apiSource: ai-platform-antigravity
         operations:
           - name: /
             methods:
@@ -103,7 +103,7 @@ products:
               limit: "200000"
               interval: "1"
               timeUnit: day
-      - apiSource: REST-AI-Antigravity
+      - apiSource: ai-platform-antigravity
         operations:
           - name: /
             methods:
@@ -113,7 +113,7 @@ products:
               limit: "200000"
               interval: "1"
               timeUnit: day
-      - apiSource: REST-AI-Antigravity
+      - apiSource: ai-platform-antigravity
         operations:
           - name: /
             methods:
@@ -123,7 +123,44 @@ products:
               limit: "200000"
               interval: "1"
               timeUnit: day
-      - apiSource: REST-AI-Antigravity
+      - apiSource: ai-platform-router
+        operations:
+          - name: /
+            methods:
+              - POST
+            model: gemini-3.5-flash-lite
+            llmTokenQuota: {}
+      - apiSource: ai-platform-router
+        operations:
+          - name: /
+            methods:
+              - POST
+            model: gemini-4-carbon
+            llmTokenQuota:
+              limit: "200000"
+              interval: "1"
+              timeUnit: day
+      - apiSource: ai-platform-router
+        operations:
+          - name: /
+            methods:
+              - POST
+            model: gemini-4-neon
+            llmTokenQuota:
+              limit: "200000"
+              interval: "1"
+              timeUnit: day
+      - apiSource: ai-platform-router
+        operations:
+          - name: /
+            methods:
+              - POST
+            model: gemini-4-hydrogen
+            llmTokenQuota:
+              limit: "200000"
+              interval: "1"
+              timeUnit: day
+      - apiSource: ai-platform-router
         operations:
           - name: /
             methods:
