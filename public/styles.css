@@ -896,6 +896,83 @@ input:invalid:user-invalid {
   margin-block-start: 0.5rem;
 }
 
+/* Full-Page Links Dialog */
+.modal-dialog-full {
+  width: min(96vw, 1080px);
+  height: min(90vh, 760px);
+  max-width: none;
+  max-height: none;
+}
+
+.modal-inner-full {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.75rem 2rem;
+  overflow-y: auto;
+}
+
+.links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  align-content: start;
+}
+
+.link-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.15rem 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.link-card:hover {
+  border-color: var(--accent, #2563eb);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.link-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.link-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.link-card-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+.link-card-url {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+  line-height: 1.35;
+}
+
+.links-empty-note {
+  margin: 2rem 0;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
 /* Standalone /desktop right-side overlay button & drawer */
 .standalone-drawer-toggle {
   position: absolute;

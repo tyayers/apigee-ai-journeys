@@ -207,7 +207,9 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     expect(favRes.status).toBe(200);
     expect(favRes.headers.get("content-type")).toContain("image/svg+xml");
     expect(html).not.toContain("Fit display");
-    expect(html).toContain('<div class="nav-heading">Links</div>');
+    expect(html).not.toContain('id="nav-rail"');
+    expect(html).toContain('id="links-btn"');
+    expect(html).toContain('id="links-dialog"');
     expect(html).not.toContain("Demo Cases");
     const cssRes = await fetch(`${baseUrl}/styles.css`);
     const css = await cssRes.text();
@@ -267,17 +269,14 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
     expect(iapMe.user.username).toBe("alice_smith");
     expect(Array.isArray(iapMe.links)).toBe(true);
 
-    // Verify /api/me returns configured sidebar links
+    // Verify /api/me returns configured links
     const prevPortal = app.config.portalHost;
-    const prevProxy = app.config.proxyUrl;
-    const prevAnalytics = app.config.analyticsUrl;
-    const prevMonitoring = app.config.monitoringUrl;
-    const prevCatalog = app.config.catalogUrl;
+    const prevLinks = app.config.links;
     app.config.portalHost = "https://portal.example.com";
-    app.config.proxyUrl = "https://console.cloud.google.com/apigee/proxies";
-    app.config.analyticsUrl = "https://console.cloud.google.com/apigee/analytics";
-    app.config.monitoringUrl = "https://console.cloud.google.com/apigee/monitoring";
-    app.config.catalogUrl = "https://console.cloud.google.com/apigee/apihub/catalog";
+    app.config.links = [
+      { name: "Apigee Proxies", url: "https://console.cloud.google.com/apigee/proxies" },
+      { name: "Apigee Analytics", url: "https://console.cloud.google.com/apigee/analytics" },
+    ];
     try {
       const linksRes = await fetch(`${baseUrl}/api/me`, { headers: iapHeaders });
       const linksData = (await linksRes.json()) as {
@@ -287,15 +286,10 @@ describe("Apigee AI Journeys — GCP IAP / ?user= Auth, users.yaml Auto-Provisio
         { name: "Apigee AI Portal", url: "https://portal.example.com/portal" },
         { name: "Apigee Proxies", url: "https://console.cloud.google.com/apigee/proxies" },
         { name: "Apigee Analytics", url: "https://console.cloud.google.com/apigee/analytics" },
-        { name: "Apigee Monitoring", url: "https://console.cloud.google.com/apigee/monitoring" },
-        { name: "Apigee Hub Catalog", url: "https://console.cloud.google.com/apigee/apihub/catalog" },
       ]);
     } finally {
       app.config.portalHost = prevPortal;
-      app.config.proxyUrl = prevProxy;
-      app.config.analyticsUrl = prevAnalytics;
-      app.config.monitoringUrl = prevMonitoring;
-      app.config.catalogUrl = prevCatalog;
+      app.config.links = prevLinks;
     }
 
     // Ensure CSRF is enforced on POST /api/vm-user/ensure

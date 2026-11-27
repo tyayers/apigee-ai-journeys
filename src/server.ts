@@ -256,16 +256,7 @@ export function createAppServer(
                 ...(config.portalHost
                   ? [{ name: "Apigee AI Portal", url: `${config.portalHost}/portal` }]
                   : []),
-                ...(config.proxyUrl ? [{ name: "Apigee Proxies", url: config.proxyUrl }] : []),
-                ...(config.analyticsUrl
-                  ? [{ name: "Apigee Analytics", url: config.analyticsUrl }]
-                  : []),
-                ...(config.monitoringUrl
-                  ? [{ name: "Apigee Monitoring", url: config.monitoringUrl }]
-                  : []),
-                ...(config.catalogUrl
-                  ? [{ name: "Apigee Hub Catalog", url: config.catalogUrl }]
-                  : []),
+                ...config.links,
               ],
               demos: DEMO_CATALOG,
               metrics,

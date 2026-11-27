@@ -467,6 +467,48 @@
       padding: 0.25rem 0;
       outline: none;
     }
+    .gateway-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem 1rem;
+      padding: 0.6rem 0.9rem;
+      margin-bottom: 1rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      font-size: 0.85rem;
+    }
+    .gateway-label {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .gateway-url {
+      font-weight: 600;
+    }
+    .curl-box {
+      margin-top: 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      background: var(--code-bg);
+    }
+    .curl-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .curl-header h3 {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+    .curl-box pre {
+      margin: 0;
+      background: var(--surface);
+    }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -499,6 +541,10 @@
       <!-- Tab 1: Welcome -->
       <section id="panel-welcome" class="panel" role="tabpanel" aria-labelledby="tab-welcome">
         <h2>Welcome to the Apigee AI Gateway Tester</h2>
+        <div class="gateway-banner">
+          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
+          <code class="gateway-url" data-gateway-url></code>
+        </div>
         <p>
           You can try out the <strong>Antigravity</strong> and <strong>Claude</strong> desktop apps and CLIs (<code>agy</code>, <code>claude</code>) directly in this VM using the Apigee AI Gateway, and use this tester app to explore and test these use-cases:
         </p>
@@ -509,43 +555,8 @@
           <li><strong>A2A &amp; MCP Governance</strong> — Invoke scoped Agent-to-Agent (A2A) skills, MCP tools, and an interactive Customer Agent backed by the AI Router.</li>
         </ul>
         <p>
-          Visit the <a id="portalLink" href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer">Apigee AI Portal</a> (opens in a new tab) to view your subscriptions and analytics usage, or open the <strong>Apigee Proxies</strong> link in the parent app sidebar and filter by <code>ai-platform</code> to inspect the proxies used.
+          Visit the <a id="portalLink" href="https://api.apigee-bap7.agenticplatform.dev/portal" target="_blank" rel="noopener noreferrer">Apigee AI Portal</a> (opens in a new tab) to view your subscriptions and analytics usage, or open the <strong>Apigee Proxies</strong> link in the parent app <strong>Links</strong> dialog and filter by <code>ai-platform</code> to inspect the proxies used.
         </p>
-
-        <details id="credentialsDetails" class="creds-details">
-          <summary id="credentialsSummary">
-            <span id="credentialsSummaryText" class="status ok">✓ Using logged in user credentials.</span>
-            <span class="hint" style="margin: 0;">Click to edit client credentials &amp; host</span>
-          </summary>
-
-          <form id="credentialsForm" action="#" method="POST">
-            <div class="grid-2">
-              <div class="field">
-                <label for="clientIdInput">Client ID</label>
-                <input type="text" id="clientIdInput" name="clientIdInput" autocomplete="off" placeholder="Enter OAuth client_id" required>
-              </div>
-              <div class="field">
-                <label for="clientSecretInput">Client Secret</label>
-                <div class="input-with-action">
-                  <input type="password" id="clientSecretInput" name="clientSecretInput" autocomplete="off" placeholder="Enter OAuth client_secret" required>
-                  <button id="toggleSecretBtn" type="button" aria-label="Show client secret">Show</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="field">
-              <label for="apigeeHostInput">Apigee Host</label>
-              <input type="url" id="apigeeHostInput" name="apigeeHostInput" required aria-describedby="apigeeHostHelp">
-              <span id="apigeeHostHelp" class="hint">Base URL for OAuth <code>/token</code> and all Apigee proxy calls (e.g. <code>https://api.apigee-bap7.agenticplatform.dev</code>).</span>
-            </div>
-
-            <div class="row">
-              <button id="saveCredentialsBtn" type="submit" class="primary">Save Credentials &amp; Host</button>
-              <button id="clearCredentialsBtn" type="button">Clear Credentials</button>
-              <span id="credentialsSaveStatus" class="status" aria-live="polite"></span>
-            </div>
-          </form>
-        </details>
 
         <div class="panel-footer">
           <button type="button" class="primary" data-next-tab="tab-token">Next: Token &amp; Config →</button>
@@ -555,9 +566,15 @@
       <!-- Tab 2: Token & KVM Management -->
       <section id="panel-token" class="panel" role="tabpanel" aria-labelledby="tab-token" hidden>
         <h2>Token &amp; KVM Configuration</h2>
+        <div class="gateway-banner">
+          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
+          <code class="gateway-url" data-gateway-url></code>
+        </div>
         <p class="hint">
           Select OAuth 2.1 scopes to obtain a JWT from <code>/token</code>, and manage <code>AI-Demo</code> KVM properties.
         </p>
+
+        <form id="credentialsForm" action="#" method="POST" hidden></form>
 
         <form id="tokenForm" action="#" method="POST">
           <fieldset>
@@ -596,6 +613,40 @@
               <label for="extraScopes">Additional Scopes (optional, space-separated)</label>
               <input type="text" id="extraScopes" name="extraScopes" placeholder="e.g. mcp">
             </div>
+
+            <details id="credentialsDetails" class="creds-details" style="margin-bottom: 1rem;">
+              <summary id="credentialsSummary">
+                <span id="credentialsSummaryText" class="status ok">✓ Using logged in user credentials.</span>
+                <span class="hint" style="margin: 0;">Click to edit client credentials &amp; host</span>
+              </summary>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label for="clientIdInput">Client ID</label>
+                  <input type="text" id="clientIdInput" name="clientIdInput" form="credentialsForm" autocomplete="off" placeholder="Enter OAuth client_id" required>
+                </div>
+                <div class="field">
+                  <label for="clientSecretInput">Client Secret</label>
+                  <div class="input-with-action">
+                    <input type="password" id="clientSecretInput" name="clientSecretInput" form="credentialsForm" autocomplete="off" placeholder="Enter OAuth client_secret" required>
+                    <button id="toggleSecretBtn" type="button" aria-label="Show client secret">Show</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="apigeeHostInput">Apigee Host</label>
+                <input type="url" id="apigeeHostInput" name="apigeeHostInput" form="credentialsForm" required aria-describedby="apigeeHostHelp">
+                <span id="apigeeHostHelp" class="hint">Base URL for OAuth <code>/token</code> and all Apigee proxy calls (e.g. <code>https://api.apigee-bap7.agenticplatform.dev</code>).</span>
+              </div>
+
+              <div class="row">
+                <button id="saveCredentialsBtn" type="submit" form="credentialsForm" class="primary">Save Credentials &amp; Host</button>
+                <button id="clearCredentialsBtn" type="button">Clear Credentials</button>
+                <span id="credentialsSaveStatus" class="status" aria-live="polite"></span>
+              </div>
+            </details>
+
             <div class="row">
               <button id="getTokenBtn" type="submit" class="primary">Get Access Token</button>
               <span id="nextRouterWrap" class="tooltip-anchor" tabindex="0">
@@ -718,6 +769,10 @@
       <!-- Tab 2: Test AI Router -->
       <section id="panel-router" class="panel" role="tabpanel" aria-labelledby="tab-router" hidden>
         <h2>Test AI Router</h2>
+        <div class="gateway-banner">
+          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
+          <code class="gateway-url" data-gateway-url></code>
+        </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
           Calls <code>ai-platform-router</code> with your token &amp; prompt configuration.
@@ -791,6 +846,14 @@
           <pre id="modelResponseOutput"></pre>
         </div>
 
+        <div class="curl-box">
+          <div class="curl-header">
+            <h3>cURL Command</h3>
+            <button type="button" data-copy-curl="routerCurlOutput">Copy cURL</button>
+          </div>
+          <pre id="routerCurlOutput"></pre>
+        </div>
+
         <div class="panel-footer">
           <button type="button" class="primary" data-next-tab="tab-antigravity">Next: Test Antigravity →</button>
         </div>
@@ -799,6 +862,10 @@
       <!-- Tab 4: Test Antigravity -->
       <section id="panel-antigravity" class="panel" role="tabpanel" aria-labelledby="tab-antigravity" hidden>
         <h2>Test Antigravity</h2>
+        <div class="gateway-banner">
+          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
+          <code class="gateway-url" data-gateway-url></code>
+        </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
           Launch Google Antigravity from the desktop or terminal via <code>ai-platform-antigravity</code> (<code>/antigravity</code>), or try the interactive CLI simulator below.
@@ -844,6 +911,14 @@ agy "Explain the Apigee AI gateway"</pre>
           </form>
         </div>
 
+        <div class="curl-box">
+          <div class="curl-header">
+            <h3>cURL Command</h3>
+            <button type="button" data-copy-curl="agyCurlOutput">Copy cURL</button>
+          </div>
+          <pre id="agyCurlOutput"></pre>
+        </div>
+
         <div class="panel-footer">
           <button type="button" class="primary" data-next-tab="tab-claude">Next: Test Claude →</button>
         </div>
@@ -852,6 +927,10 @@ agy "Explain the Apigee AI gateway"</pre>
       <!-- Tab 5: Test Claude -->
       <section id="panel-claude" class="panel" role="tabpanel" aria-labelledby="tab-claude" hidden>
         <h2>Test Claude</h2>
+        <div class="gateway-banner">
+          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
+          <code class="gateway-url" data-gateway-url></code>
+        </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
           Launch Claude Code from the terminal or desktop via <code>ai-platform-claude</code> (<code>/claude</code>), or try the interactive CLI simulator below.
@@ -897,6 +976,14 @@ claude -p "Summarize recent changes"</pre>
           </form>
         </div>
 
+        <div class="curl-box">
+          <div class="curl-header">
+            <h3>cURL Commands (Vertex AI &amp; Messages API)</h3>
+            <button type="button" data-copy-curl="claudeCurlOutput">Copy cURL</button>
+          </div>
+          <pre id="claudeCurlOutput"></pre>
+        </div>
+
         <div class="panel-footer">
           <button type="button" class="primary" data-next-tab="tab-a2amcp">Next: Test A2A / MCP →</button>
         </div>
@@ -905,6 +992,10 @@ claude -p "Summarize recent changes"</pre>
       <!-- Tab 6: Test A2A / MCP -->
       <section id="panel-a2amcp" class="panel" role="tabpanel" aria-labelledby="tab-a2amcp" hidden>
         <h2>Test Customer A2A &amp; MCP</h2>
+        <div class="gateway-banner">
+          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
+          <code class="gateway-url" data-gateway-url></code>
+        </div>
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
         <p class="hint">
           Tests <code>customers-a2a-v1</code> and <code>customers-mcp-v1</code> with your configured API key.
@@ -941,6 +1032,14 @@ claude -p "Summarize recent changes"</pre>
           <pre id="agentResponseOutput"></pre>
         </div>
 
+        <div class="curl-box">
+          <div class="curl-header">
+            <h3>cURL Command</h3>
+            <button type="button" data-copy-curl="a2amcpCurlOutput">Copy cURL</button>
+          </div>
+          <pre id="a2amcpCurlOutput"></pre>
+        </div>
+
         <div class="panel-footer">
           <button type="button" class="primary" data-next-tab="tab-agent">Next: Example Agent →</button>
         </div>
@@ -954,6 +1053,11 @@ claude -p "Summarize recent changes"</pre>
             <span class="hint" style="margin-top: 0;">Uses the AI Router Model API to plan and invoke A2A skills using your configured API key.</span>
           </div>
           <button id="newChatBtn" type="button">New Chat</button>
+        </div>
+
+        <div class="gateway-banner">
+          <span class="gateway-label">Apigee X on GCP, can be duplicated with Apigee hybrid to AWS, Azure or K8s on-premise</span>
+          <code class="gateway-url" data-gateway-url></code>
         </div>
 
         <div class="auth-banner" data-auth-warning hidden>Get an access token on the Token &amp; Config tab first.</div>
@@ -993,6 +1097,14 @@ claude -p "Summarize recent changes"</pre>
           </div>
           <button id="sendChatBtn" type="submit" class="primary">Send Message</button>
         </form>
+
+        <div class="curl-box">
+          <div class="curl-header">
+            <h3>cURL Commands</h3>
+            <button type="button" data-copy-curl="agentCurlOutput">Copy cURL</button>
+          </div>
+          <pre id="agentCurlOutput"></pre>
+        </div>
       </section>
     </main>
   </div>
@@ -1270,6 +1382,7 @@ claude -p "Summarize recent changes"</pre>
           if (nextRouterTooltip) nextRouterTooltip.hidden = false;
         }
       }
+      if (typeof updateAllCurlCommands === "function") updateAllCurlCommands();
     }
 
     if (nextRouterWrap) {
@@ -2128,6 +2241,7 @@ claude -p "Summarize recent changes"</pre>
             currentModel = nextModel;
             modelBadge.textContent = `model: ${currentModel}`;
             appendLine(`✓ Switched model to ${currentModel}`, "terminal-line-ok");
+            if (typeof updateAllCurlCommands === "function") updateAllCurlCommands();
           }
           return;
         }
@@ -2164,7 +2278,7 @@ claude -p "Summarize recent changes"</pre>
       });
 
       printBanner();
-      return { runCommand };
+      return { runCommand, getModel: () => currentModel };
     }
 
     const agySim = createCliSimulator({
@@ -2248,6 +2362,165 @@ claude -p "Summarize recent changes"</pre>
       });
     });
 
+    // --- Gateway URL Banners & Live cURL Previews ---
+    function updateGatewayUrlDisplays() {
+      const host = getApigeeHost();
+      document.querySelectorAll("[data-gateway-url]").forEach((el) => {
+        el.textContent = host;
+      });
+    }
+
+    function shellQuoteSingle(str) {
+      return `'${String(str).replace(/'/g, "'\\''")}'`;
+    }
+
+    function updateAllCurlCommands() {
+      const host = getApigeeHost();
+      const token = getAccessToken() || "<YOUR_ACCESS_TOKEN>";
+
+      // Tab 3: Test AI Router
+      const routerCurlEl = document.getElementById("routerCurlOutput");
+      if (routerCurlEl) {
+        const headerFlags = [
+          `-H "Content-Type: application/json"`,
+          `-H "Authorization: Bearer ${token}"`
+        ];
+        if (forceEuCheckbox.checked) headerFlags.push(`-H "x-data-classification: true"`);
+        if (screenPromptCheckbox.checked) headerFlags.push(`-H "x-screen-prompt: true"`);
+        if (maskPromptCheckbox.checked) headerFlags.push(`-H "x-mask-prompt: true"`);
+        const body = JSON.stringify({
+          model: modelNameSelect.value,
+          stream: modelStreamCheckbox.checked,
+          messages: [{ role: "user", content: modelPromptInput.value || "Respond with PONG." }]
+        });
+        routerCurlEl.textContent =
+          `curl -sS -X POST "${host}${routerEndpointSelect.value}" \\\n` +
+          `  ${headerFlags.join(" \\\n  ")} \\\n` +
+          `  -d ${shellQuoteSingle(body)}`;
+      }
+
+      // Tab 4: Test Antigravity
+      const agyCurlEl = document.getElementById("agyCurlOutput");
+      if (agyCurlEl) {
+        const agyModel = agySim.getModel();
+        const agyBody = JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: "Respond with PONG." }] }]
+        });
+        agyCurlEl.textContent =
+          `curl -sS -X POST "${host}/antigravity/v1beta/models/${encodeURIComponent(agyModel)}:generateContent" \\\n` +
+          `  -H "Content-Type: application/json" \\\n` +
+          `  -H "Authorization: Bearer ${token}" \\\n` +
+          `  -d ${shellQuoteSingle(agyBody)}`;
+      }
+
+      // Tab 5: Test Claude
+      const claudeCurlEl = document.getElementById("claudeCurlOutput");
+      if (claudeCurlEl) {
+        const claudeModel = claudeSim.getModel();
+        const vertexBody = JSON.stringify({
+          anthropic_version: "vertex-2023-10-16",
+          max_tokens: 512,
+          messages: [{ role: "user", content: "Respond with PONG." }]
+        });
+        const messagesBody = JSON.stringify({
+          model: claudeModel,
+          max_tokens: 512,
+          messages: [{ role: "user", content: "Respond with PONG." }]
+        });
+        claudeCurlEl.textContent =
+          `# Vertex AI format:\n` +
+          `curl -sS -X POST "${host}/claude/projects/default/locations/global/publishers/anthropic/models/${encodeURIComponent(claudeModel)}:rawPredict" \\\n` +
+          `  -H "Content-Type: application/json" \\\n` +
+          `  -H "Authorization: Bearer ${token}" \\\n` +
+          `  -d ${shellQuoteSingle(vertexBody)}\n\n` +
+          `# Anthropic Messages API format:\n` +
+          `curl -sS -X POST "${host}/claude/v1/messages?beta=true" \\\n` +
+          `  -H "Content-Type: application/json" \\\n` +
+          `  -H "Authorization: Bearer ${token}" \\\n` +
+          `  -d ${shellQuoteSingle(messagesBody)}`;
+      }
+
+      // Tab 6: Test A2A / MCP
+      const a2amcpCurlEl = document.getElementById("a2amcpCurlOutput");
+      if (a2amcpCurlEl) {
+        const presets = getAgentPresets();
+        const preset = presets[agentPresetSelect.value] || presets.a2a_card;
+        const targetUrl = agentUrlInput.value.trim() || preset.url;
+        if (preset.method === "GET") {
+          a2amcpCurlEl.textContent =
+            `curl -sS "${targetUrl}" \\\n` +
+            `  -H "Authorization: Bearer ${token}"`;
+        } else {
+          const payload = (agentBodyInput.value || preset.body || "{}").trim();
+          a2amcpCurlEl.textContent =
+            `curl -sS -X POST "${targetUrl}" \\\n` +
+            `  -H "Content-Type: application/json" \\\n` +
+            `  -H "Authorization: Bearer ${token}" \\\n` +
+            `  -d ${shellQuoteSingle(payload)}`;
+        }
+      }
+
+      // Tab 7: Example Agent (A2A)
+      const agentCurlEl = document.getElementById("agentCurlOutput");
+      if (agentCurlEl) {
+        const chatBody = JSON.stringify({
+          model: chatModelSelect.value,
+          stream: false,
+          messages: [{ role: "user", content: chatInput.value.trim() || "List our active customers" }]
+        });
+        agentCurlEl.textContent =
+          `# 1. Discover A2A Agent Card:\n` +
+          `curl -sS "${host}${API_CONFIG.a2aPath}/.well-known/agent.json" \\\n` +
+          `  -H "Authorization: Bearer ${token}"\n\n` +
+          `# 2. Plan with AI Router:\n` +
+          `curl -sS -X POST "${host}${chatRouterEndpoint.value}" \\\n` +
+          `  -H "Content-Type: application/json" \\\n` +
+          `  -H "Authorization: Bearer ${token}" \\\n` +
+          `  -d ${shellQuoteSingle(chatBody)}`;
+      }
+    }
+
+    [
+      routerEndpointSelect,
+      modelNameSelect,
+      modelStreamCheckbox,
+      forceEuCheckbox,
+      screenPromptCheckbox,
+      maskPromptCheckbox,
+      modelPromptInput,
+      agentPresetSelect,
+      agentUrlInput,
+      agentBodyInput,
+      chatRouterEndpoint,
+      chatModelSelect,
+      chatInput,
+      apigeeHostInput
+    ].forEach((node) => {
+      if (!node) return;
+      node.addEventListener("input", () => {
+        updateGatewayUrlDisplays();
+        updateAllCurlCommands();
+      });
+      node.addEventListener("change", () => {
+        updateGatewayUrlDisplays();
+        updateAllCurlCommands();
+      });
+    });
+
+    document.querySelectorAll("[data-copy-curl]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const targetId = btn.getAttribute("data-copy-curl");
+        const pre = targetId ? document.getElementById(targetId) : null;
+        if (!pre) return;
+        try {
+          await navigator.clipboard.writeText(pre.textContent || "");
+          const prev = btn.textContent;
+          btn.textContent = "Copied!";
+          setTimeout(() => { btn.textContent = prev; }, 1500);
+        } catch (_) {}
+      });
+    });
+
     // Initialize on page load
     (() => {
       const url = new URL(window.location.href);
@@ -2287,6 +2560,8 @@ claude -p "Summarize recent changes"</pre>
       clientIdInput.value = getClientId();
       clientSecretInput.value = getClientSecret();
       apigeeHostInput.value = getApigeeHost();
+      updateGatewayUrlDisplays();
+      updateAllCurlCommands();
       const portalLink = document.getElementById("portalLink");
       if (portalLink) {
         portalLink.href = `${getApigeeHost()}/portal`;

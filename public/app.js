@@ -28,8 +28,6 @@ const el = {
   userSelectSubmit: document.getElementById("user-select-submit"),
 
   workspaceView: document.getElementById("workspace-view"),
-  navToggleBtn: document.getElementById("nav-toggle-btn"),
-  navRail: document.getElementById("nav-rail"),
   topbarBrandLink: document.getElementById("topbar-brand-link"),
   openNewTabLink: document.getElementById("open-new-tab-link"),
   themeToggleBtn: document.getElementById("theme-toggle-btn"),
@@ -37,12 +35,13 @@ const el = {
   logoutBtn: document.getElementById("logout-btn"),
   metricCpuPill: document.getElementById("metric-cpu-pill"),
   metricMemPill: document.getElementById("metric-mem-pill"),
-  sidebarVmUser: document.getElementById("sidebar-vm-user"),
-  sidebarVmHome: document.getElementById("sidebar-vm-home"),
-  sidebarCpuAvg: document.getElementById("sidebar-cpu-avg"),
-  sidebarMemUsed: document.getElementById("sidebar-mem-used"),
-  navLinksList: document.getElementById("nav-links-list"),
-  navLinksEmpty: document.getElementById("nav-links-empty"),
+  linksBtn: document.getElementById("links-btn"),
+  menuLinksBtn: document.getElementById("menu-links-btn"),
+  drawerLinksBtn: document.getElementById("drawer-links-btn"),
+  linksDialog: document.getElementById("links-dialog"),
+  closeLinksDialogBtn: document.getElementById("close-links-dialog-btn"),
+  linksGrid: document.getElementById("links-grid"),
+  linksEmptyNote: document.getElementById("links-empty-note"),
 
   rdpStatusDot: document.getElementById("rdp-status-dot"),
   rdpStatusText: document.getElementById("rdp-status-text"),
@@ -201,12 +200,6 @@ function renderHostMetrics(metrics) {
   for (const pill of [el.metricMemPill, el.menuMetricMemPill, el.drawerMetricMemPill]) {
     if (pill) pill.textContent = memLabel;
   }
-  if (el.sidebarCpuAvg) {
-    el.sidebarCpuAvg.textContent = `${cpu5m}% (now ${cpuNow}%)`;
-  }
-  if (el.sidebarMemUsed) {
-    el.sidebarMemUsed.textContent = memLabel.replace("MEM ", "");
-  }
 }
 
 function setRdpStatus(dotState, label) {
@@ -244,42 +237,44 @@ function setStandaloneDrawerOpen(open) {
   el.standaloneDrawerToggle.setAttribute("aria-expanded", String(open));
 }
 
-function renderSidebarLinks(links) {
-  if (!el.navLinksList) return;
-  el.navLinksList.replaceChildren();
+function renderLinksDialog(links) {
+  if (!el.linksGrid) return;
+  el.linksGrid.replaceChildren();
   const validLinks = Array.isArray(links)
     ? links.filter((item) => item && typeof item.name === "string" && typeof item.url === "string" && item.url)
     : [];
 
   if (validLinks.length === 0) {
-    if (el.navLinksEmpty) el.navLinksEmpty.hidden = false;
+    if (el.linksEmptyNote) el.linksEmptyNote.hidden = false;
     return;
   }
-  if (el.navLinksEmpty) el.navLinksEmpty.hidden = true;
+  if (el.linksEmptyNote) el.linksEmptyNote.hidden = true;
 
   for (const item of validLinks) {
-    const li = document.createElement("li");
     const a = document.createElement("a");
-    a.className = "nav-link-btn";
+    a.className = "link-card";
     a.href = item.url;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
 
-    const label = document.createElement("span");
-    label.className = "nav-link-label";
-    label.textContent = item.name;
+    const top = document.createElement("div");
+    top.className = "link-card-top";
+
+    const title = document.createElement("span");
+    title.className = "link-card-title";
+    title.textContent = item.name;
 
     const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     icon.setAttribute("viewBox", "0 0 24 24");
-    icon.setAttribute("width", "14");
-    icon.setAttribute("height", "14");
+    icon.setAttribute("width", "16");
+    icon.setAttribute("height", "16");
     icon.setAttribute("fill", "none");
     icon.setAttribute("stroke", "currentColor");
     icon.setAttribute("stroke-width", "1.75");
     icon.setAttribute("stroke-linecap", "round");
     icon.setAttribute("stroke-linejoin", "round");
     icon.setAttribute("aria-hidden", "true");
-    icon.classList.add("nav-link-icon");
+    icon.classList.add("link-card-icon");
     const path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path1.setAttribute("d", "M15 3h6v6");
     const path2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -288,9 +283,19 @@ function renderSidebarLinks(links) {
     path3.setAttribute("d", "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6");
     icon.append(path1, path2, path3);
 
-    a.append(label, icon);
-    li.append(a);
-    el.navLinksList.append(li);
+    top.append(title, icon);
+
+    const urlEl = document.createElement("span");
+    urlEl.className = "link-card-url";
+    try {
+      const parsed = new URL(item.url);
+      urlEl.textContent = `${parsed.host}${parsed.pathname === "/" ? "" : parsed.pathname}`;
+    } catch {
+      urlEl.textContent = item.url;
+    }
+
+    a.append(top, urlEl);
+    el.linksGrid.append(a);
   }
 }
 
@@ -404,8 +409,6 @@ async function provisionAndAutoConnect() {
     }
     state.user = ensured.user;
     state.rdpPassword = ensured.rdpPassword;
-    el.sidebarVmUser.textContent = state.user.username;
-    el.sidebarVmHome.textContent = state.user.homeDir;
 
     const viewer = ensureRdpViewer();
     await viewer.connect({
@@ -437,8 +440,6 @@ function renderAuthenticatedWorkspace() {
   el.topbarUserEmail.textContent = state.user.email;
   if (el.menuUserEmail) el.menuUserEmail.textContent = state.user.email;
   if (el.drawerUserEmail) el.drawerUserEmail.textContent = state.user.email;
-  el.sidebarVmUser.textContent = state.user.username;
-  el.sidebarVmHome.textContent = `/home/${state.user.username}`;
   el.overlayUsername.textContent = state.user.username;
   el.topbarBrandLink.href = withUserQuery("/");
   el.openNewTabLink.href = withUserQuery("/desktop");
@@ -452,8 +453,6 @@ function renderAuthenticatedWorkspace() {
 
   if (state.isStandaloneTab) {
     el.workspaceView.classList.add("is-standalone-desktop");
-    el.navRail.hidden = true;
-    el.navToggleBtn.hidden = true;
     el.openNewTabLink.hidden = true;
     if (el.standaloneDrawerToggle) el.standaloneDrawerToggle.hidden = false;
     setStandaloneDrawerOpen(false);
@@ -463,10 +462,6 @@ function renderAuthenticatedWorkspace() {
     }
   } else {
     el.workspaceView.classList.remove("is-standalone-desktop");
-    const sidebarCollapsed = localStorage.getItem("sidebar-collapsed") === "true";
-    el.navRail.hidden = sidebarCollapsed;
-    el.navToggleBtn.hidden = false;
-    el.navToggleBtn.setAttribute("aria-expanded", String(!sidebarCollapsed));
     el.openNewTabLink.hidden = false;
     if (el.standaloneDrawerToggle) el.standaloneDrawerToggle.hidden = true;
     setStandaloneDrawerOpen(false);
@@ -483,6 +478,7 @@ function renderAuthenticatedWorkspace() {
 async function bootstrap() {
   setupThemeToggle();
   installDialogLightDismissFallback(el.clipboardDialog);
+  installDialogLightDismissFallback(el.linksDialog);
 
   if (state.isStandaloneTab) {
     el.userSelectForm.action = "/desktop";
@@ -511,13 +507,6 @@ async function bootstrap() {
       }
     });
   }
-
-  el.navToggleBtn.addEventListener("click", () => {
-    const nextHidden = !el.navRail.hidden;
-    el.navRail.hidden = nextHidden;
-    el.navToggleBtn.setAttribute("aria-expanded", String(!nextHidden));
-    localStorage.setItem("sidebar-collapsed", String(nextHidden));
-  });
 
   el.topbarMoreBtn?.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -642,6 +631,19 @@ async function bootstrap() {
     btn?.addEventListener("click", handleFullscreen);
   }
 
+  // Links modal
+  const handleOpenLinks = () => {
+    setMoreMenuOpen(false);
+    setStandaloneDrawerOpen(false);
+    el.linksDialog?.showModal();
+  };
+
+  for (const btn of [el.linksBtn, el.menuLinksBtn, el.drawerLinksBtn]) {
+    btn?.addEventListener("click", handleOpenLinks);
+  }
+
+  el.closeLinksDialogBtn?.addEventListener("click", () => el.linksDialog?.close());
+
   // Clipboard modal
   const handleOpenClipboard = () => {
     setMoreMenuOpen(false);
@@ -699,7 +701,7 @@ async function bootstrap() {
   state.authSource = data.authSource;
   state.user = data.user;
   state.keepSessionsRunning = data.keepSessionsRunning !== false;
-  renderSidebarLinks(data.links);
+  renderLinksDialog(data.links);
   renderAuthenticatedWorkspace();
 }
 

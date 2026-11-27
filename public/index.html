@@ -64,20 +64,6 @@
   <div id="workspace-view" class="app-layout" hidden>
     <header class="topbar">
       <div class="topbar-left">
-        <button
-          type="button"
-          id="nav-toggle-btn"
-          class="icon-btn"
-          aria-label="Toggle navigation sidebar"
-          aria-expanded="true"
-          aria-controls="nav-rail"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="16" rx="2"></rect>
-            <path d="M9 4v16"></path>
-          </svg>
-        </button>
-
         <a id="topbar-brand-link" href="/" class="topbar-brand">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
             <path d="M12 2C12 7.52285 16.4772 12 22 12C16.4772 12 12 16.4772 12 22C12 16.4772 7.52285 12 2 12C7.52285 12 12 7.52285 12 2Z"></path>
@@ -98,6 +84,14 @@
           <span id="metric-cpu-pill" class="mono-pill metric-pill">CPU —</span>
           <span id="metric-mem-pill" class="mono-pill metric-pill">MEM —</span>
         </div>
+
+        <button type="button" id="links-btn" class="btn btn-ghost btn-compact topbar-hide-sm">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+          <span>Links</span>
+        </button>
 
         <button type="button" id="clipboard-btn" class="btn btn-ghost btn-compact topbar-hide-sm" disabled>
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -181,6 +175,9 @@
 
             <div class="more-menu-divider"></div>
 
+            <button type="button" id="menu-links-btn" class="more-menu-item" role="menuitem">
+              <span>Links</span>
+            </button>
             <button type="button" id="menu-clipboard-btn" class="more-menu-item" role="menuitem" disabled>
               <span>Clipboard</span>
             </button>
@@ -208,51 +205,6 @@
     </header>
 
     <div class="workspace-body">
-      <aside id="nav-rail" class="nav-rail" aria-label="Demo environments">
-        <div class="nav-section">
-          <div class="nav-heading">Environment</div>
-          <ul id="nav-workstation-list" class="nav-list">
-            <li>
-              <button type="button" class="nav-item is-active" aria-current="page">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <rect x="2" y="3" width="20" height="14" rx="2"></rect>
-                  <line x1="8" y1="21" x2="16" y2="21"></line>
-                  <line x1="12" y1="17" x2="12" y2="21"></line>
-                </svg>
-                <span>VM Remote Desktop</span>
-              </button>
-            </li>
-          </ul>
-        </div>
-
-        <div class="nav-section">
-          <div class="nav-heading">Links</div>
-          <ul id="nav-links-list" class="nav-list nav-links-list"></ul>
-          <p id="nav-links-empty" class="nav-empty-note" hidden>
-            No external links configured.
-          </p>
-        </div>
-
-        <div class="nav-footer">
-          <div class="meta-kv">
-            <span class="meta-k">VM user</span>
-            <code id="sidebar-vm-user"></code>
-          </div>
-          <div class="meta-kv">
-            <span class="meta-k">Home</span>
-            <code id="sidebar-vm-home"></code>
-          </div>
-          <div class="meta-kv">
-            <span class="meta-k">CPU (5m avg)</span>
-            <code id="sidebar-cpu-avg">—</code>
-          </div>
-          <div class="meta-kv">
-            <span class="meta-k">Memory</span>
-            <code id="sidebar-mem-used">—</code>
-          </div>
-        </div>
-      </aside>
-
       <main id="main-stage" class="main-stage">
         <div id="rdp-viewport" class="rdp-viewport">
           <canvas
@@ -333,6 +285,10 @@
                 <span>Switch to full view</span>
               </a>
 
+              <button type="button" id="drawer-links-btn" class="btn btn-secondary btn-compact standalone-drawer-btn">
+                <span>Links</span>
+              </button>
+
               <button type="button" id="drawer-clipboard-btn" class="btn btn-secondary btn-compact standalone-drawer-btn" disabled>
                 <span>Clipboard</span>
               </button>
@@ -389,6 +345,28 @@
           <button type="submit" id="send-clipboard-btn" class="btn btn-primary">Send to VM</button>
         </div>
       </form>
+    </div>
+  </dialog>
+
+  <!-- Full-Page Modal Dialog: Important Links -->
+  <dialog id="links-dialog" class="modal-dialog modal-dialog-full" closedby="any" aria-labelledby="links-dialog-title">
+    <div class="modal-inner modal-inner-full">
+      <div class="modal-header">
+        <div>
+          <h2 id="links-dialog-title">Important Links</h2>
+          <p class="modal-desc" style="margin-bottom: 0;">Quick access to your Apigee AI Gateway, Portal, and Cloud Console resources.</p>
+        </div>
+        <button type="button" id="close-links-dialog-btn" class="icon-btn" aria-label="Close links dialog">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div id="links-grid" class="links-grid"></div>
+      <p id="links-empty-note" class="links-empty-note" hidden>
+        No links configured. Set the <code>LINKS</code> environment variable to add links here.
+      </p>
     </div>
   </dialog>
 

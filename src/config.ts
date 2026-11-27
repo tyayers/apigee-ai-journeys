@@ -23,10 +23,7 @@ export interface AppConfig {
   portalHost: string | null;
   portalAdminClientId: string | null;
   portalAdminClientSecret: string | null;
-  proxyUrl: string | null;
-  analyticsUrl: string | null;
-  monitoringUrl: string | null;
-  catalogUrl: string | null;
+  links: Array<{ name: string; url: string }>;
   usersFile: string;
   dataDir: string;
   configDir: string;
@@ -42,6 +39,29 @@ function parsePort(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
   const n = Number.parseInt(value, 10);
   return Number.isInteger(n) && n > 0 && n <= 65535 ? n : fallback;
+}
+
+function parseLinks(value: string | undefined): Array<{ name: string; url: string }> {
+  const raw = value?.trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (item): item is { name: string; url: string } =>
+          Boolean(item) &&
+          typeof item === "object" &&
+          typeof item.name === "string" &&
+          item.name.trim().length > 0 &&
+          typeof item.url === "string" &&
+          item.url.trim().length > 0
+      )
+      .map((item) => ({ name: item.name.trim(), url: item.url.trim() }));
+  } catch {
+    console.warn("[config] Invalid LINKS JSON; ignoring.");
+    return [];
+  }
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
@@ -105,10 +125,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     portalHost: env.PORTAL_HOST?.trim().replace(/\/+$/, "") || null,
     portalAdminClientId: env.PORTAL_ADMIN_CLIENT_ID?.trim() || null,
     portalAdminClientSecret: env.PORTAL_ADMIN_CLIENT_SECRET?.trim() || null,
-    proxyUrl: env.PROXY_URL?.trim() || null,
-    analyticsUrl: env.ANALYTICS_URL?.trim() || null,
-    monitoringUrl: env.MONITORING_URL?.trim() || null,
-    catalogUrl: env.CATALOG_URL?.trim() || null,
+    links: parseLinks(env.LINKS),
     usersFile,
     dataDir: env.DATA_DIR ? path.resolve(env.DATA_DIR) : path.join(baseDir, "data"),
     configDir: path.join(baseDir, "config"),
