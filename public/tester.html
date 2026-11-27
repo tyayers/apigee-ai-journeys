@@ -862,13 +862,7 @@
         </form>
 
         <form id="kvmForm" action="#" method="POST">
-          <div class="row" style="justify-content: space-between; margin-bottom: 0.75rem;">
-            <h3 style="margin: 0;">AI-Demo KVM Properties</h3>
-            <div class="row">
-              <button id="loadKvmBtn" type="button">Load from Proxy</button>
-              <button id="saveKvmBtn" type="submit" class="primary">Save to Proxy</button>
-            </div>
-          </div>
+          <h3 style="margin: 0 0 0.75rem;">AI-Demo KVM Properties</h3>
 
           <fieldset>
             <legend>Region Throttle &amp; Stop Flags</legend>
@@ -956,6 +950,11 @@
             <button id="addOverrideBtn" type="button">+ Add Model Override</button>
             <span class="hint">Maps a source model (stored as <code>override-&lt;source&gt;</code> with <code>/</code> replaced by <code>--</code>) to a destination model.</span>
           </fieldset>
+
+          <div class="row" style="justify-content: flex-end; margin-top: 0.5rem;">
+            <button id="loadKvmBtn" type="button">Load from Proxy</button>
+            <button id="saveKvmBtn" type="submit" class="primary">Save to Proxy</button>
+          </div>
         </form>
 
         <div id="kvmResult" hidden style="margin-top: 1rem;">
